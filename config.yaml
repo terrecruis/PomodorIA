@@ -1,0 +1,86 @@
+# ══════════════════════════════════════════════════════════════
+# PomodorIA — Configurazione Serra Domotica con Edge AI
+# ══════════════════════════════════════════════════════════════
+
+project:
+  name: "PomodorIA"
+  version: "1.0.0"
+  description: "Serra Domotica con Edge AI — Riconoscimento Patologie Fogliari del Pomodoro"
+
+# ─── Percorsi ───────────────────────────────────────────────
+paths:
+  dataset_root: "./datasets/plantvillage"
+  checkpoint: "./models/CNN_64f-k3-3blk.pth"
+  optimized_dir: "./models/optimized"
+  log_dir: "./logs"
+
+# ─── Modello CNN (TomatoCNN) ───────────────────────────────
+model:
+  n_filters: 64
+  kernel_size: 3
+  num_blocks: 3
+  num_classes: 10
+  mode: "full_precision"        # "full_precision" | "optimized"
+  classes:
+    - "Tomato___Bacterial_spot"
+    - "Tomato___Early_blight"
+    - "Tomato___Late_blight"
+    - "Tomato___Leaf_Mold"
+    - "Tomato___Septoria_leaf_spot"
+    - "Tomato___Spider_mites Two-spotted_spider_mite"
+    - "Tomato___Target_Spot"
+    - "Tomato___Tomato_Yellow_Leaf_Curl_Virus"
+    - "Tomato___Tomato_mosaic_virus"
+    - "Tomato___healthy"
+
+# ─── Preprocessing (identico al training) ──────────────────
+preprocessing:
+  image_size: 64
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
+
+# ─── Simulazione Raspberry Pi ──────────────────────────────
+edge_simulation:
+  num_threads: 1                # simula 1 core (Raspberry Pi)
+  device: "cpu"                 # no GPU/MPS — Raspberry Pi non ha CUDA
+  monitor_resources: true
+
+# ─── Ciclo Orchestratore ───────────────────────────────────
+orchestrator:
+  cycle_interval_sec: 5         # secondi tra cicli sense-think-act
+  max_cycles: 100               # 0 = infinito
+  demo_mode: true               # accelera per demo
+
+# ─── Soglie Agente Decisionale (PEAS) ─────────────────────
+agent:
+  confidence_threshold: 0.70          # sotto → "richiesta ispezione umana"
+  humidity_high_threshold: 80.0       # % → ventilazione se malattia fungina
+  soil_moisture_low_threshold: 30.0   # % → irrigazione
+  consecutive_alerts_threshold: 3     # N rilevamenti consecutivi → allarme
+  temperature_high: 35.0              # °C → ventilazione
+  temperature_low: 10.0               # °C → alert freddo
+  light_low_threshold: 2000.0         # lux → alert luce scarsa
+
+# ─── Sensori Simulati (range realistici) ───────────────────
+sensors:
+  temperature:
+    base_min: 18.0
+    base_max: 32.0
+    noise_std: 1.5
+  humidity:
+    base_min: 40.0
+    base_max: 90.0
+    noise_std: 5.0
+  soil_moisture:
+    base_min: 20.0
+    base_max: 80.0
+    noise_std: 3.0
+  light:
+    base_min: 1000.0
+    base_max: 50000.0
+    noise_std: 500.0
+
+# ─── Virtual Camera ───────────────────────────────────────
+virtual_camera:
+  bias_class: null              # null = random, oppure "Tomato___Early_blight"
+  use_test_split: true

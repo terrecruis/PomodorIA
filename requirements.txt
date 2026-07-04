@@ -1,0 +1,32 @@
+# PomodorIA — Dipendenze
+# Serra Domotica con Edge AI per riconoscimento patologie del pomodoro
+
+# ─── Core ML / Edge AI ───
+torch>=2.1.0                  # CNN inference + pruning + quantizzazione
+torchvision>=0.16.0           # transforms (preprocessing immagini)
+onnx>=1.15.0                  # export modello ONNX
+onnxruntime>=1.17.0           # inferenza ONNX (target edge)
+
+# ─── Simulazione & Sensori ───
+Pillow>=10.0.0                # caricamento immagini dataset
+numpy>=1.24.0                 # array numerici
+
+# ─── Agente & Orchestratore ───
+pyyaml>=6.0                   # configurazione YAML
+
+# ─── Logging & Analisi ───
+pandas>=2.0.0                 # logging strutturato, analisi CSV
+psutil>=5.9.0                 # monitoraggio risorse (CPU, RAM)
+
+# ─── Dashboard ───
+streamlit>=1.30.0             # dashboard di monitoraggio
+
+# ─── Testing ───
+pytest>=7.4.0                 # test unitari
+pytest-cov>=4.1.0             # coverage
+
+# ─── Notebook & Visualizzazione ───
+jupyter>=1.0.0                # analisi risultati
+matplotlib>=3.7.0             # grafici
+seaborn>=0.12.0               # grafici avanzati
+scikit-learn>=1.3.0           # metriche (confusion matrix, F1, etc.)

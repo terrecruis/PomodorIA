@@ -1,0 +1,51 @@
+# ═══════════════════════════════════════════
+# PomodorIA — .gitignore
+# ═══════════════════════════════════════════
+
+# ─── Python ───
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ─── Virtual Environment ───
+.venv/
+venv/
+ENV/
+
+# ─── Dataset (troppo pesante per git) ───
+# datasets/
+
+# ─── Modelli pesanti ───
+*.pth
+*.onnx
+models/optimized/
+
+# ─── Logs ───
+logs/*.csv
+logs/*.db
+logs/*.sqlite
+
+# ─── OS ───
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+
+# ─── IDE ───
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── Jupyter ───
+.ipynb_checkpoints/
+
+# ─── Misc ───
+*.log
+*.tmp
