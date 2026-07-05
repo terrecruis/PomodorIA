@@ -35,6 +35,7 @@ from datetime import datetime
 from pathlib import Path
 
 import yaml
+import psutil
 
 # ── Path setup ───────────────────────────────────────────────
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
