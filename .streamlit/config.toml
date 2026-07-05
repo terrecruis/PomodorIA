@@ -1,0 +1,7 @@
+[ui]
+# Nasconde la toolbar in alto (pulsante Deploy, menu, ecc.)
+hideTopBar = true
+
+[browser]
+# Evita di aprire automaticamente il browser al lancio
+gatherUsageStats = false

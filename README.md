@@ -73,15 +73,15 @@ blight) e **Tomato mosaic virus** (classe più rara, recall più basso).
 Riprendendo il modello **IoT World Forum** visto a lezione, il PoC copre così
 i livelli:
 
-| Livello IoTWF | Nel PoC reale (target) | Nel PoC simulato (quello che costruiamo) |
+| Livello IoTWF | Nel PoC reale (target) | Nel PoC implementato (software) |
 |---|---|---|
-| 1. Physical Devices & Controllers | Fotocamera, sensori DHT22/igrometro, pompa, ventola | **Moduli Python mock** che generano/leggono dati sintetici |
-| 2. Connectivity | Wi-Fi del Raspberry Pi | Loopback locale / MQTT su `localhost` (opzionale) |
-| 3. Edge (Fog) Computing | Inferenza CNN quantizzata sul Raspberry Pi | Inferenza CNN quantizzata **sul PC**, con vincoli di risorse simulati |
-| 4. Data Accumulation | Storage locale su SD card | File SQLite/JSON o CSV di log |
-| 5. Data Abstraction | Normalizzazione dei dati per il livello applicativo | Classi Python che restituiscono un "readings object" uniforme |
-| 6. Application | Dashboard di monitoraggio | Dashboard Streamlit/Flask (opzionale) |
-| 7. Collaboration & Processes | Notifiche all'agricoltore, integrazione gestionale | Log/alert testuali, notifica simulata |
+| 1. Physical Devices & Controllers | Fotocamera, sensori DHT22/igrometro, pompa, ventola | **Moduli Python mock** (`VirtualCameraSensor`, `EnvironmentSensorSimulator`, `FakeGPIO`) |
+| 2. Connectivity | Wi-Fi del Raspberry Pi | **Loopback locale** (comunicazione in-memory tra moduli Python via interfacce strutturate) |
+| 3. Edge (Fog) Computing | Inferenza CNN quantizzata sul Raspberry Pi | Inferenza CNN quantizzata **su CPU** (con vincoli di risorse simulati: 1 core, solo CPU) |
+| 4. Data Accumulation | Storage locale su SD card | **Log CSV strutturati** (`logs/run_*.csv`) |
+| 5. Data Abstraction | Normalizzazione dei dati per il livello applicativo | **Classi e dataclass Python** (`SensorReading`, `InferenceResult`, `AgentDecision`) |
+| 6. Application | Dashboard di monitoraggio | **Dashboard interattiva real-time** (Streamlit + Plotly in `dashboard/app_streamlit.py`) |
+| 7. Collaboration & Processes | Notifiche all'agricoltore, integrazione gestionale | **Alert critici e notifiche** loggate ed esposte in UI (`NotificationActuator`) |
 
 Questo mapping è utile anche per la relazione/presentazione del progetto,
 perché lega esplicitamente le scelte implementative alla teoria del corso.
@@ -225,14 +225,16 @@ while True:
     time.sleep(CYCLE_INTERVAL)
 ```
 
-### 3.6 Logging / Dashboard (opzionale ma consigliato)
+### 3.6 Logging / Dashboard
 
-- Log strutturato (CSV o SQLite) di ogni ciclo: utile per generare i grafici
-  della relazione finale (accuracy live, distribuzione predizioni, tempi di
-  inferenza).
-- Dashboard semplice con **Streamlit** o **Flask**: mostra ultima immagine
-  analizzata, predizione, stato sensori/attuatori, storico. Non indispensabile
-  per la validità scientifica del PoC ma alza molto l'impatto della demo.
+- **Log strutturato CSV** (`logs/run_*.csv`): ad ogni ciclo l'orchestratore registra tutte le metriche del sistema (timestamp, ground truth, predizione, confidenza, tempi di inferenza, CPU/RAM, valori ambientali, stato attuatori e ragionamento dell'agente).
+- **Dashboard real-time con Streamlit e Plotly** (`dashboard/app_streamlit.py`): interfaccia grafica avanzata che esegue e visualizza il ciclo integrato sense-think-act. Include:
+  - Visualizzazione live della foto analizzata e barra delle probabilità softmax (10 classi);
+  - Gauge chart interattivi per i sensori ambientali e mini-trend nel tempo;
+  - Indicatori LED di stato per il banco attuatori (`ActuatorBank`) e log del ragionamento PEAS;
+  - System Monitor interattivo (CPU %, RAM, latenza ms) per il monitoraggio dei vincoli Edge;
+  - Grafici di analisi temporale (accuracy cumulativa, distribuzione predizioni, istogramma latenze, radar sensori);
+  - Tabella storico degli ultimi 30 cicli.
 
 ---
 
@@ -271,17 +273,18 @@ accuracy/dimensione/latenza — è il cuore "tecnico" della parte Edge AI.
   "simil-Raspberry Pi" perché è il motore di inferenza più diffuso in ambito
   embedded.
 
-### 4.3 Metriche da confrontare (tabella da produrre nella relazione)
+### 4.3 Risultati sperimentali di compressione
 
-| Metrica | Baseline (.pth originale) | Pruned | Quantized | Pruned+Quantized |
-|---|---|---|---|---|
-| Accuracy (test set) | 96% | | | |
-| Dimensione modello (MB) | | | | |
-| Tempo medio di inferenza per immagine (ms, su CPU) | | | | |
-| N. parametri non nulli | | | | |
+Dalla suite di benchmark implementata (`benchmarks/benchmark_compression.py`), abbiamo misurato le seguenti performance sulla nostra architettura:
 
-Questa tabella è il "risultato principale" della parte Edge del progetto,
-analoga a quella prodotta nel confronto FCNN vs CNN.
+| Variante | Accuracy | Dimensione su disco | Latenza media (CPU, 1 thread) | Parametri totali / non nulli | Sparsità | RAM processo |
+|---|---|---|---|---|---|---|
+| **Baseline (float32)** | **99.2%** | 33.44 MB | 2.28 ms | 8,765,066 / 8,765,066 | 0.0% | 404 MB |
+| **Pruned (L1 Unstructured, 30%)** | 86.0% | 33.44 MB | 2.28 ms | 8,765,066 / 8,653,961 | 1.3% | 293 MB |
+| **Pruned + Dynamic Quant (INT8)** | 86.2% | **9.43 MB** | 2.98 ms | 370,816 / 259,711 | 30.0% | 339 MB |
+| **ONNX Runtime (float32/INT8)** | **99.2%** | — | **1.58 ms** | — | — | 746 MB |
+
+> **Nota sui risultati Edge**: La quantizzazione dinamica (`Pruned + Dynamic Quant`) riduce la dimensione del modello di **~3.5x** (da 33.4 MB a 9.4 MB), rendendolo ideale per il caricamento nella RAM limitata di microcontrollori o schede embedded. Per quanto riguarda la velocità di esecuzione, il motore **ONNX Runtime** si dimostra il più efficiente sul nostro target CPU, abbattendo la latenza a **~1.58 ms per scatto** preservando l'accuratezza del modello originale.
 
 ---
 
@@ -292,99 +295,131 @@ Pi" senza avere l'hardware:
 
 1. **Limitare le risorse usate dal processo**, per rendere i numeri di
    latenza/throughput più rappresentativi di un dispositivo embedded:
-   - vincolare l'inferenza a **1 solo core CPU** (`torch.set_num_threads(1)`,
-     oppure `taskset` su Linux) — un Raspberry Pi 4 ha 4 core ARM, ma
-     limitare i thread rende il confronto più onesto rispetto a un laptop
-     multi-core;
+   - vincolare l'inferenza a **1 solo core CPU** (`torch.set_num_threads(1)`),
+     rendendo il confronto più onesto rispetto a un laptop multi-core;
    - forzare `device = "cpu"` sempre (niente GPU/MPS), dato che il Raspberry
      Pi non ha una GPU CUDA;
    - misurare RAM/CPU usage con `psutil` durante l'inferenza, da riportare
      come proxy di "fattibilità su Raspberry Pi" (i modelli Raspberry Pi 4/5
      hanno 2–8 GB di RAM).
-2. **Mock delle GPIO**: una classe `FakeGPIO` con la stessa interfaccia di
+2. **Mock delle GPIO**: una classe `FakeGPIO` (`actuators/fake_gpio.py`) con la stessa interfaccia di
    `RPi.GPIO` (`setup()`, `output()`, `input()`), così il codice degli
-   attuatori è "drop-in replaceable" su hardware reale.
-3. **(Opzionale) Comunicazione IoT realistica**: montare un broker **MQTT**
-   locale (Mosquitto) e far comunicare i moduli (sensori → topic, agente →
-   subscribe, attuatori → topic comandi) invece di semplici chiamate a
-   funzione. Rende il PoC molto più vicino a un vero sistema IoT (protocollo
-   citato esplicitamente nei tuoi appunti come standard per dispositivi
-   vincolati) e dimostra di aver capito il livello *Connectivity* dello
-   stack, anche se qui gira tutto su `localhost`.
+   attuatori è immediatamente utilizzabile su hardware reale.
+3. **Comunicazione modulare in-memory (Livello Connectivity & Abstraction)**: i moduli comunicano tramite un'architettura software disaccoppiata basata su dataclass e interfacce ben definite (`SensorReading`, `InferenceResult`, `AgentDecision`). Questo rispecchia fedelmente il livello di astrazione del dato (Livello 5 IoTWF), garantendo leggerezza e rendendo il codice pronto per essere agganciato a un bus reale (es. MQTT) su hardware fisico.
 
 ---
 
-## 6. Struttura del repository proposta
+## 6. Struttura del repository
 
 ```
-tomato-edge-greenhouse/
+PomodorIA/
 ├── README.md
 ├── requirements.txt
 ├── config.yaml                  # soglie, intervalli, path dataset, modalità modello
 ├── models/
-│   ├── best_cnn_64f_k3_3blk.pth # checkpoint originale
-│   ├── model.py                 # TomatoFCNN / TomatoCNN (quello già fornito)
-│   ├── compress.py              # pruning + quantizzazione + export ONNX
-│   └── optimized/                # checkpoint compressi generati
+│   ├── CNN_64f-k3-3blk.pth      # checkpoint originale della CNN (float32)
+│   ├── model.py                 # architettura TomatoCNN
+│   ├── compress.py              # pruning, quantizzazione dinamica, export ONNX
+│   └── optimized/               # checkpoint compressi generati (ONNX, ecc.)
 ├── sensors/
-│   ├── virtual_camera.py
-│   └── environment_simulator.py
+│   ├── virtual_camera.py        # fotocamera virtuale che campiona dal dataset
+│   └── environment_simulator.py # simulatore sensori T/Hum/Soil/Lux (con Data Fusion)
 ├── edge/
-│   └── inference_engine.py      # carica modello, preprocessing, predict()
+│   └── inference_engine.py      # motore di inferenza (preprocessing, predict, timing)
 ├── agent/
-│   └── decision_agent.py        # regole PEAS
+│   └── decision_agent.py        # agente decisionale razionale (regole PEAS)
 ├── actuators/
-│   ├── fake_gpio.py
-│   └── actuators.py
+│   ├── fake_gpio.py             # mock hardware livello basso (interfaccia RPi.GPIO)
+│   └── actuators.py             # banco attuatori (irrigazione, ventola, allarme, notifiche)
 ├── orchestrator/
-│   └── main_loop.py             # ciclo sense-think-act
+│   └── main_loop.py             # orchestratore del ciclo sense-think-act
 ├── dashboard/
-│   └── app_streamlit.py         # opzionale
+│   └── app_streamlit.py         # dashboard real-time interattiva (Streamlit + Plotly)
 ├── logs/
-│   └── run_YYYYMMDD.csv
-├── benchmarks/
-│   └── benchmark_compression.py # produce la tabella accuracy/size/latenza
-└── notebooks/
-    └── analisi_risultati.ipynb
+│   └── run_*.csv                # log strutturati generati dai cicli
+└── benchmarks/
+    ├── benchmark_compression.py # suite di benchmark di quantizzazione e pruning
+    └── benchmark_results.csv    # risultati di performance misurati
 ```
 
 ---
 
-## 7. Stack tecnologico consigliato
+## 7. Guida rapida: Installazione e Avvio
+
+### 7.1 Prerequisiti e Setup dell'ambiente
+
+Assicurati di avere Python 3.10+ installato sul tuo sistema. Per configurare l'ambiente isolato e installare tutte le dipendenze:
+
+```bash
+# 1. Entra nella cartella del progetto
+cd PomodorIA
+
+# 2. Crea un virtual environment (raccomandato)
+python3 -m venv .venv
+
+# 3. Attiva l'ambiente virtuale
+# Su macOS / Linux:
+source .venv/bin/activate
+# Su Windows:
+# .venv\Scripts\activate
+
+# 4. Installa le dipendenze richieste (PyTorch, Streamlit, Plotly, ecc.)
+pip install -r requirements.txt
+```
+
+### 7.2 Configurazione del Dataset
+
+Prima di avviare il sistema, verifica che il percorso del dataset nel file [`config.yaml`](file:///Users/francescoterrecuso/Desktop/PomodorIA/config.yaml) punti correttamente alla cartella di *PlantVillage-Tomato* presente sul tuo computer:
+
+```yaml
+paths:
+  dataset_root: "/percorso/al/tuo/dataset/plantvillage"
+```
+
+### 7.3 Avvio della Dashboard Real-Time
+
+Per avviare la simulazione interattiva della serra domotica con l'interfaccia grafica real-time (Streamlit):
+
+```bash
+streamlit run dashboard/app_streamlit.py
+```
+
+Il comando aprirà automaticamente nel tuo browser la dashboard all'indirizzo **`http://localhost:8501`**, dalla quale potrai:
+- Eseguire e monitorare il ciclo integrato `sense → think → act` passo dopo passo o in automatico;
+- Osservare le diagnosi della CNN con le barre di probabilità softmax sulle 10 classi del pomodoro;
+- Monitorare i sensori ambientali in tempo reale (temperatura, umidità suolo/aria, luminosità);
+- Verificare il ragionamento dell'agente PEAS e lo scatto degli attuatori virtuali (irrigazione, ventola, allarmi);
+- Consultare il System Monitor per misurare latenza di inferenza, consumo RAM e utilizzo CPU (su 1 thread, come su Raspberry Pi).
+
+---
+
+## 8. Stack tecnologico utilizzato
 
 | Ambito | Strumenti |
 |---|---|
 | ML / Edge AI | PyTorch, `torch.nn.utils.prune`, `torch.quantization`, ONNX, ONNX Runtime |
 | Simulazione risorse | `psutil`, `time`, `torch.set_num_threads` |
-| Comunicazione IoT (opzionale) | MQTT (`paho-mqtt`) + broker Mosquitto locale |
-| Dashboard (opzionale) | Streamlit oppure Flask + Chart.js |
-| Logging/dati | `pandas`, SQLite o CSV |
-| Config | `pyyaml` |
-| Testing | `pytest` per i moduli sensori/agente/attuatori |
+| Dashboard & UI | Streamlit, Plotly, PIL |
+| Logging / Gestione Dati | `pandas`, file CSV strutturati |
+| Configurazione | `pyyaml` (`config.yaml`) |
+| Testing | Script integrati e test end-to-end |
 
 ---
 
-## 8. Roadmap di sviluppo (fasi)
+## 9. Roadmap e Fasi Implementate
 
-1. **Setup progetto**: struttura repo, config, caricamento checkpoint `.pth`,
-   verifica che l'inferenza baseline riproduca ~96% sul test set.
-2. **Sensor layer**: Virtual Camera + simulatore ambientale, con log delle
-   letture.
-3. **Edge AI layer**: wrapper di inferenza pulito (preprocessing identico al
-   training), con timing.
-4. **Compressione**: pruning, quantizzazione, export ONNX; produzione della
-   tabella comparativa di §4.3.
-5. **Agente decisionale**: regole PEAS, integrazione con attuatori simulati.
-6. **Orchestratore**: main loop completo, prima demo end-to-end.
-7. **Simulazione vincoli Raspberry Pi**: limitazione risorse, misure
-   CPU/RAM/latenza.
-8. **(Opzionale) MQTT + Dashboard**: per una demo più "IoT-vera".
-9. **Valutazione finale e relazione**: metriche ML (accuracy pre/post
-   compressione) + metriche di sistema (latenza, RAM, robustezza dell'agente).
+1. **Setup progetto e Modello Baseline**: struttura del repository, file di configurazione (`config.yaml`), caricamento del checkpoint PyTorch (`CNN_64f-k3-3blk.pth`) e verifica del funzionamento dell'inferenza.
+2. **Sensor Layer**: implementazione della fotocamera virtuale (`VirtualCameraSensor`) con aggancio al dataset e del simulatore di sensori ambientali (`EnvironmentSensorSimulator`) con correlazioni euristiche alle patologie (Data Fusion).
+3. **Edge AI Layer**: sviluppo dell'`InferenceEngine` con supporto per modalità multiple (`full_precision` e `optimized`) e misurazione accurata dei tempi di inferenza.
+4. **Compressione per l'Edge**: realizzazione della suite di compressione (`models/compress.py`) con Unstructured/Structured Pruning, Dynamic Quantization e quantizzazione ONNX Runtime, e salvataggio dei benchmark (`benchmarks/benchmark_results.csv`).
+5. **Actuator Layer**: implementazione dell'infrastruttura di hardware virtuale (`FakeGPIO`) e del banco attuatori (`ActuatorBank`: irrigazione, ventilazione, allarmi LED, notifiche).
+6. **Agente Decisionale PEAS**: sviluppo dell'agente razionale (`DecisionAgent`) basato su regole prioritarie, memoria di stato (arretramento/persistenza allarmi) e logica di Data Fusion.
+7. **Orchestratore e Simulazione Hardware**: implementazione del ciclo integrato sense-think-act (`orchestrator/main_loop.py`) con monitoraggio delle risorse esterne (1 thread CPU, memoria RAM, CPU usage tramite `psutil`).
+8. **Dashboard Real-Time**: realizzazione dell'interfaccia grafica avanzata in Streamlit e Plotly (`dashboard/app_streamlit.py`) per il controllo e la visualizzazione interattiva del sistema della serra domotica.
 
 ---
 
-## 9. Metriche di valutazione complessive del PoC
+## 10. Metriche di valutazione complessive del PoC
 
 - **Metriche ML**: accuracy, precision/recall/F1 per classe (specialmente
   Early blight e Tomato mosaic virus, già note come critiche), confusion
@@ -398,7 +433,7 @@ tomato-edge-greenhouse/
 
 ---
 
-## 10. Collegamento con la teoria del corso (utile per la relazione)
+## 11. Collegamento con la teoria del corso
 
 - **IoTWF a 7 livelli** → mapping esplicito di ogni componente del PoC (§2).
 - **PEAS e tipologie di agente** → definizione formale dell'agente
@@ -415,7 +450,7 @@ tomato-edge-greenhouse/
 
 ---
 
-## 11. Possibili estensioni (se vuoi alzare il livello del progetto)
+## 12. Possibili estensioni
 
 - **Federated Learning simulato**: più "serre virtuali" che addestrano
   localmente e aggregano i pesi, richiamando il paradigma citato nei tuoi
@@ -429,7 +464,7 @@ tomato-edge-greenhouse/
 
 ---
 
-## 12. Riferimenti
+## 13. Riferimenti
 
 - Dataset: **PlantVillage — Tomato** (14.529 immagini, 10 classi).
 - Modello: `TomatoCNN` (n_filters=64, kernel_size=3, num_blocks=3),

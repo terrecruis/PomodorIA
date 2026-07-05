@@ -9,7 +9,7 @@ project:
 
 # ─── Percorsi ───────────────────────────────────────────────
 paths:
-  dataset_root: "./datasets/plantvillage"
+  dataset_root: "/Users/francescoterrecuso/Desktop/plantvillage"
   checkpoint: "./models/CNN_64f-k3-3blk.pth"
   optimized_dir: "./models/optimized"
   log_dir: "./logs"
@@ -84,3 +84,20 @@ sensors:
 virtual_camera:
   bias_class: null              # null = random, oppure "Tomato___Early_blight"
   use_test_split: true
+
+# ─── Compressione Modello (Fase 4) ────────────────────────
+compression:
+  pruning:
+    sparsity: 0.30              # frazione filtri Conv2d da potare (0.0–1.0)
+    method: "ln_structured"     # "ln_structured" (structured) o "l1_unstructured"
+    norm: 1                     # norma usata per il ranking (L1)
+  quantization:
+    backend: "qnnpack"           # "qnnpack" (ARM/macOS/Raspberry Pi) | "fbgemm" (x86 Linux)
+    n_calibration_batches: 10   # batch usati per stimare i range di attivazione
+  onnx:
+    opset_version: 17
+    quantize: true              # quantizza anche il modello ONNX (dynamic INT8)
+  benchmark:
+    n_warmup: 5                 # predizioni di warmup (non conteggiate nel tempo)
+    n_measure: 100              # predizioni su cui mediare la latenza
+    max_images: 500             # immagini max per il benchmark accuracy
