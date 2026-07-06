@@ -1,4 +1,4 @@
-[Progetto_IoT_EdgeAI_SmartGreenhouse.md](https://github.com/user-attachments/files/29661212/Progetto_IoT_EdgeAI_SmartGreenhouse.md)
+
 # Serra Domotica con Edge AI — Riconoscimento Patologie Fogliari del Pomodoro
 ### Proof of Concept software (simulazione locale, senza hardware reale)
 
