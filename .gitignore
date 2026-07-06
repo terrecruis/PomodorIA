@@ -49,3 +49,6 @@ ehthumbs.db
 # ─── Misc ───
 *.log
 *.tmp
+
+# ─── Documentazione personale (Overleaf) ───
+docs/
