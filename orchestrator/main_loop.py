@@ -418,6 +418,15 @@ def main():
         "--config", type=str, default=None,
         help="Percorso al file di configurazione (default: config.yaml)"
     )
+    parser.add_argument(
+        "--mode", choices=["full_precision", "optimized"], default=None,
+        help="Forza la modalità del modello (default: da config.yaml)"
+    )
+    parser.add_argument(
+        "--variant", choices=["auto", "onnx", "pruned_quantized", "pruned"], default=None,
+        help="Se --mode=optimized, forza quale file compresso usare "
+             "(default: da config.yaml, 'auto' se non specificato)"
+    )
     args = parser.parse_args()
 
     # Setup logging
@@ -435,6 +444,10 @@ def main():
         config.setdefault("orchestrator", {})["cycle_interval_sec"] = args.interval
     if args.quiet:
         config.setdefault("orchestrator", {})["demo_mode"] = False
+    if args.mode is not None:
+        config.setdefault("model", {})["mode"] = args.mode
+    if args.variant is not None:
+        config.setdefault("model", {})["optimized_variant"] = args.variant
 
     orchestrator = Orchestrator(config, forced_class=args.forced_class)
     orchestrator.run()

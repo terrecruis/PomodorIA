@@ -33,6 +33,16 @@ import torch
 import torch.nn.functional as F
 import psutil
 
+# ── Backend di quantizzazione ────────────────────────────────
+# Deve essere impostato PRIMA di caricare un modello .pth quantizzato
+# (torch.load fallisce con "Unknown qengine" altrimenti), esattamente
+# come fatto in models/compress.py al momento della creazione dei pesi.
+_supported_qengines = torch.backends.quantized.supported_engines
+if "qnnpack" in _supported_qengines:
+    torch.backends.quantized.engine = "qnnpack"
+elif "fbgemm" in _supported_qengines:
+    torch.backends.quantized.engine = "fbgemm"
+
 # Aggiunge la root del progetto al path per import relativi
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from models.model import TomatoCNN
@@ -113,6 +123,7 @@ class InferenceEngine:
         self.config = config
         self.classes: List[str] = config["model"]["classes"]
         self.mode: str = config["model"].get("mode", "full_precision")
+        self.optimized_variant: str = config["model"].get("optimized_variant", "auto")
         self.device = torch.device(config["edge_simulation"].get("device", "cpu"))
 
         # ── Simulazione Raspberry Pi: limita a 1 thread ──────────
@@ -123,6 +134,7 @@ class InferenceEngine:
         # ── Caricamento modello ──────────────────────────────────
         self._model_pytorch: Optional[torch.nn.Module] = None
         self._onnx_session = None  # onnxruntime.InferenceSession, se usato
+        self.loaded_variant: str = "full_precision"  # etichetta descrittiva del file caricato
 
         self._load_model()
 
@@ -140,28 +152,74 @@ class InferenceEngine:
         Carica il modello in base alla modalità configurata.
 
         full_precision: carica il checkpoint .pth originale (float32)
-        optimized:      cerca prima il .pth quantizzato, poi il .onnx
+        optimized:      carica la variante scelta da `model.optimized_variant`
+                        (config.yaml), oppure la cerca in cascata se
+                        variant == "auto":
+                            ONNX quantizzato > PyTorch pruned+quantizzato >
+                            PyTorch pruned > fallback full_precision
         """
         if self.mode == "full_precision":
             self._load_pytorch_model(
                 checkpoint_path=self.config["paths"]["checkpoint"],
                 quantized=False
             )
+            self.loaded_variant = "full_precision"
 
         elif self.mode == "optimized":
             optimized_dir = self.config["paths"]["optimized_dir"]
 
-            # Priorità: ONNX > PyTorch quantizzato
-            onnx_path = os.path.join(optimized_dir, "model_quantized.onnx")
-            pt_quantized_path = os.path.join(optimized_dir, "model_pruned_quantized.pth")
-            pt_pruned_path = os.path.join(optimized_dir, "model_pruned.pth")
+            variants = {
+                "onnx":              ("onnx", os.path.join(optimized_dir, "model_quantized.onnx")),
+                "pruned_quantized":  ("pth_quantized", os.path.join(optimized_dir, "model_pruned_quantized.pth")),
+                "pruned":            ("pth", os.path.join(optimized_dir, "model_pruned.pth")),
+            }
+
+            if self.optimized_variant != "auto":
+                # ── Variante scelta esplicitamente (da config.yaml o dashboard) ──
+                if self.optimized_variant not in variants:
+                    raise ValueError(
+                        f"optimized_variant non valido: '{self.optimized_variant}'. "
+                        f"Usa: 'auto', {', '.join(repr(k) for k in variants)}"
+                    )
+                kind, path = variants[self.optimized_variant]
+                if not os.path.exists(path):
+                    print(
+                        f"⚠️  Variante '{self.optimized_variant}' richiesta ma file "
+                        f"'{path}' non trovato. Fallback a full_precision. "
+                        "(hai eseguito 'python models/compress.py'?)"
+                    )
+                    self.mode = "full_precision"
+                    self._load_pytorch_model(
+                        checkpoint_path=self.config["paths"]["checkpoint"],
+                        quantized=False
+                    )
+                    self.loaded_variant = "full_precision"
+                    return
+                if kind == "onnx":
+                    self._load_onnx_model(path)
+                    self.loaded_variant = "optimized_onnx"
+                elif kind == "pth_quantized":
+                    self._load_pytorch_model(path, quantized=True)
+                    self.loaded_variant = "optimized_pruned_quantized"
+                else:
+                    self._load_pytorch_model(path, quantized=False)
+                    self.loaded_variant = "optimized_pruned"
+                return
+
+            # ── variant == "auto": cascata di fallback originale ──
+            onnx_path = variants["onnx"][1]
+            pt_quantized_path = variants["pruned_quantized"][1]
+            pt_pruned_path = variants["pruned"][1]
 
             if os.path.exists(onnx_path):
                 self._load_onnx_model(onnx_path)
+                self.loaded_variant = "optimized_onnx"
             elif os.path.exists(pt_quantized_path):
                 self._load_pytorch_model(pt_quantized_path, quantized=True)
+                self.loaded_variant = "optimized_pruned_quantized"
             elif os.path.exists(pt_pruned_path):
                 self._load_pytorch_model(pt_pruned_path, quantized=False)
+                self.loaded_variant = "optimized_pruned"
             else:
                 print(
                     "⚠️  Nessun modello ottimizzato trovato in "
@@ -172,6 +230,7 @@ class InferenceEngine:
                     checkpoint_path=self.config["paths"]["checkpoint"],
                     quantized=False
                 )
+                self.loaded_variant = "full_precision"
         else:
             raise ValueError(
                 f"Modalità non supportata: '{self.mode}'. "
@@ -311,7 +370,7 @@ class InferenceEngine:
             all_probabilities=probs_list,
             inference_time_ms=inference_ms,
             ram_used_mb=max(ram_before_mb, ram_after_mb),
-            model_mode=self.mode,
+            model_mode=self.loaded_variant,
         )
 
     def _predict_onnx(self, image_tensor: torch.Tensor) -> InferenceResult:
@@ -353,7 +412,7 @@ class InferenceEngine:
             all_probabilities=probs_list,
             inference_time_ms=inference_ms,
             ram_used_mb=ram_mb,
-            model_mode="optimized_onnx",
+            model_mode=self.loaded_variant,
         )
 
     # ─────────────────────────────────────────────────────────────
@@ -392,6 +451,7 @@ class InferenceEngine:
         """Restituisce un dizionario con le info del motore di inferenza."""
         return {
             "mode": self.mode,
+            "variant": self.loaded_variant,
             "device": str(self.device),
             "num_threads": torch.get_num_threads(),
             "model_size_mb": self.get_model_size_mb(),

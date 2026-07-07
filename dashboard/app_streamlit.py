@@ -56,6 +56,12 @@ CLASS_COLORS = {
     "Target Spot": "#ff7675", "TYLCV": "#ee5a24", "Mosaic Virus": "#d63031",
     "Bacterial Spot": "#7c5cfc",
 }
+MODE_LABELS = {
+    "full_precision":               "FULL PRECISION (float32)",
+    "optimized_onnx":                "OPTIMIZED · ONNX INT8",
+    "optimized_pruned_quantized":    "OPTIMIZED · PRUNED+QUANT INT8",
+    "optimized_pruned":              "OPTIMIZED · PRUNED (float32)",
+}
 BIAS_OPTIONS = ["— Random —"] + list(CLASS_LABELS.keys())
 _C = dict(teal="#00d4aa", purple="#7c5cfc", amber="#f59e0b",
           red="#ee5a24", green="#00b894", muted="rgba(255,255,255,0.38)")
@@ -246,7 +252,7 @@ def _cfg() -> dict:
 # ══════════════════════════════════════════════════════════════
 # INIT COMPONENTS
 # ══════════════════════════════════════════════════════════════
-def _init(config: dict, mode: str, bias: Optional[str]):
+def _init(config: dict, mode: str, bias: Optional[str], variant: str = "auto"):
     import copy
     from sensors.virtual_camera import VirtualCameraSensor
     from sensors.environment_simulator import EnvironmentSensorSimulator
@@ -256,6 +262,7 @@ def _init(config: dict, mode: str, bias: Optional[str]):
 
     cfg = copy.deepcopy(config)
     cfg["model"]["mode"] = mode
+    cfg["model"]["optimized_variant"] = variant
     cfg.setdefault("virtual_camera", {})["bias_class"] = bias
 
     ss = st.session_state
@@ -268,6 +275,7 @@ def _init(config: dict, mode: str, bias: Optional[str]):
     ss.init      = True
     ss.cfg_mode  = mode
     ss.cfg_bias  = bias
+    ss.cfg_variant = variant
 
 # ══════════════════════════════════════════════════════════════
 # CYCLE RUNNER
@@ -635,6 +643,23 @@ def _sidebar(config: dict):
             ["full_precision","optimized"],
             format_func=lambda x: "Full Precision (float32)" if x=="full_precision" else "Ottimizzato (INT8)",
             key="sel_mode")
+
+        variant = "auto"
+        if mode == "optimized":
+            variant = st.selectbox(
+                "Variante ottimizzata",
+                ["auto", "onnx", "pruned_quantized", "pruned"],
+                format_func=lambda v: {
+                    "auto": "Auto (priorità: ONNX > pruned+quant > pruned)",
+                    "onnx": "ONNX quantizzato (~stessa accuracy baseline)",
+                    "pruned_quantized": "Pruned + Quantizzato INT8 (più compresso, accuracy più bassa)",
+                    "pruned": "Solo Pruned (float32)",
+                }[v],
+                key="sel_variant",
+                help="Forza quale file in models/optimized/ usare, invece di lasciare "
+                     "che il sistema scelga automaticamente il primo disponibile.",
+            )
+
         bias_raw = st.selectbox("Classe forzata", BIAS_OPTIONS, key="sel_bias")
         bias = None if bias_raw.startswith("—") else bias_raw
         interval = st.slider("Intervallo cicli (sec)", 0.0, 10.0, 1.0, 0.5, key="sel_int")
@@ -647,9 +672,10 @@ def _sidebar(config: dict):
         running = ss.get("running", False)
         if not running:
             if st.button("Avvia Simulazione", key="btn_start"):
-                if (not ss.get("init") or ss.get("cfg_mode")!=mode or ss.get("cfg_bias")!=bias):
+                if (not ss.get("init") or ss.get("cfg_mode")!=mode
+                        or ss.get("cfg_bias")!=bias or ss.get("cfg_variant")!=variant):
                     with st.spinner("Inizializzazione..."):
-                        _init(config, mode, bias)
+                        _init(config, mode, bias, variant)
                 ss.running = True; ss.interval = interval; ss.max_cyc = max_cyc
                 st.rerun()
         else:
@@ -674,6 +700,8 @@ def _sidebar(config: dict):
         ram_now = psutil.Process().memory_info().rss / 1024**2
         threads = torch.get_num_threads()
         model_mb = ss.engine.get_model_size_mb() if ss.get("engine") else 0.0
+        variant_loaded = ss.engine.loaded_variant if ss.get("engine") else "—"
+        variant_label = MODE_LABELS.get(variant_loaded, variant_loaded)
 
         cycles = ss.get("cycles", [])
         avg_ms = sum(c["ms"] for c in cycles)/len(cycles) if cycles else 0
@@ -686,8 +714,10 @@ def _sidebar(config: dict):
           {_rpi_bar(cpu_now, "#7c5cfc")}
           <div class="sl" style="margin-top:6px"><span class="sl-k">{_icon("database",12,"rgba(255,255,255,0.4)")} RAM processo</span><span class="sl-v">{ram_now:.0f} MB</span></div>
           {_rpi_bar(ram_now/4000*100, "#00d4aa")}
-          <div class="sl" style="margin-top:6px"><span class="sl-k">{_icon("layers",12,"rgba(255,255,255,0.4)")} Modello</span><span class="sl-v">{model_mb:.1f} MB</span></div>
+          <div class="sl" style="margin-top:6px"><span class="sl-k">{_icon("layers",12,"rgba(255,255,255,0.4)")} Dimensione file</span><span class="sl-v">{model_mb:.1f} MB</span></div>
           <div class="sl"><span class="sl-k">{_icon("zap",12,"rgba(255,255,255,0.4)")} Lat. media</span><span class="sl-v">{avg_ms:.1f} ms</span></div>
+          <div class="sl" style="margin-top:6px;border-bottom:none"><span class="sl-k">{_icon("microscope",12,"rgba(255,255,255,0.4)")} Modello in uso</span></div>
+          <div style="font-size:.72rem;font-weight:700;color:#00d4aa;text-align:right;margin-top:-4px">{variant_label}</div>
           <div style="font-size:.6rem;color:rgba(255,255,255,.2);text-align:center;margin-top:8px">RPi 4: 4 core ARM · 2–8 GB RAM · inference on CPU</div>
         </div>
         """, unsafe_allow_html=True)
@@ -867,13 +897,14 @@ def _main(config: dict):
         # Timestamp last cycle + mode badge
         if latest:
             mode_c = "#00d4aa" if "full" in latest["mode"] else "#7c5cfc"
+            mode_label = MODE_LABELS.get(latest["mode"], latest["mode"].upper())
             st.markdown(
                 f'<div style="display:flex;justify-content:space-between;align-items:center;'
                 f'margin-top:8px;padding:8px 12px;background:rgba(255,255,255,0.02);'
                 f'border-radius:8px;border:1px solid rgba(255,255,255,0.05)">'
                 f'<span style="font-size:.7rem;color:{_C["muted"]}">{_icon("clock",12,"currentColor")} Ultimo ciclo: <b style="color:rgba(255,255,255,.7)">{latest["ts"]}</b></span>'
                 f'<span style="font-size:.68rem;font-weight:700;color:{mode_c};letter-spacing:.05em">'
-                f'{_icon("layers",12,mode_c)} {latest["mode"].upper()}</span>'
+                f'{_icon("layers",12,mode_c)} {mode_label}</span>'
                 f'</div>',
                 unsafe_allow_html=True,
             )

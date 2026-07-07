@@ -22,6 +22,11 @@ model:
   num_blocks: 3
   num_classes: 10
   mode: "full_precision"        # "full_precision" | "optimized"
+  optimized_variant: "auto"     # solo se mode="optimized". Valori:
+                                 #   "auto"             -> cascata: onnx > pruned_quantized > pruned > fallback
+                                 #   "onnx"             -> models/optimized/model_quantized.onnx
+                                 #   "pruned_quantized" -> models/optimized/model_pruned_quantized.pth
+                                 #   "pruned"           -> models/optimized/model_pruned.pth
   classes:
     - "Tomato___Bacterial_spot"
     - "Tomato___Early_blight"

@@ -409,6 +409,14 @@ def export_to_onnx(
             "output": {0: "batch_size"},
         },
         verbose=False,
+        # Il nuovo esportatore "dynamo" (default da PyTorch 2.9+) genera, per
+        # questa architettura, un grafo con uno shape-mismatch attorno al
+        # flatten (x.view(x.size(0), -1)) che fa fallire silenziosamente
+        # onnxruntime.quantization.quantize_dynamic() più avanti nella
+        # pipeline (l'eccezione viene intercettata e si ripiega su una
+        # copia non quantizzata, vanificando la compressione). L'esportatore
+        # "legacy" (TorchScript-based) non ha questo problema.
+        dynamo=False,
     )
 
     size_mb = measure_file_size_mb(output_path)
