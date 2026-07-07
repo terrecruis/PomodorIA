@@ -9,7 +9,8 @@ project:
 
 # ─── Percorsi ───────────────────────────────────────────────
 paths:
-  dataset_root: "/Users/francescoterrecuso/Desktop/plantvillage"
+  # dataset_root: "/Users/francescoterrecuso/Desktop/plantvillage"
+  dataset_root: "./plantvillage_testset"
   checkpoint: "./models/CNN_64f-k3-3blk.pth"
   optimized_dir: "./models/optimized"
   log_dir: "./logs"
