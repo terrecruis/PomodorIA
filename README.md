@@ -1,12 +1,23 @@
 
-# Serra Domotica con Edge AI — Riconoscimento Patologie Fogliari del Pomodoro
-### Proof of Concept software (simulazione locale, senza hardware reale)
+<div align="center">
+
+# 🍅 PomodorIA
+### Serra Domotica con Edge AI — Riconoscimento Patologie Fogliari del Pomodoro
+
+*Proof of Concept software — simulazione locale del ciclo IoT sense → think → act, senza hardware reale*
+
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-CNN-EE4C2C?logo=pytorch&logoColor=white)
+![ONNX](https://img.shields.io/badge/ONNX-Runtime-005CED?logo=onnx&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-FF4B4B?logo=streamlit&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
+![Status](https://img.shields.io/badge/Status-PoC%20Attivo-brightgreen)
 
 **Autori:** Vellotti Gianmarco, Terrecuso Francesco
 **Corso:** Internet of Things — Università degli Studi di Napoli Federico II
-**Modello ML di partenza:** `TomatoCNN` (progetto P14, esame di Neural Networks)
+**Modello ML di partenza:** TomatoCNN (progetto P14, esame di Neural Networks)
 
----
+</div>
 
 ## 1. Obiettivo del progetto
 
