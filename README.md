@@ -264,8 +264,6 @@ accuracy/dimensione/latenza — è il cuore "tecnico" della parte Edge AI.
 - **Structured pruning** (rimozione di interi filtri/canali convoluzionali,
   `ln_structured` su `dim=0`): più efficace su CPU (Raspberry Pi) perché
   riduce davvero le operazioni, non solo azzera pesi.
-- Consigliato: pruning **iterativo** con fine-tuning breve dopo ogni step
-  (poche epoche), per recuperare l'accuracy persa.
 
 ### 4.2 Quantizzazione
 
@@ -299,28 +297,7 @@ Dalla suite di benchmark implementata (`benchmarks/benchmark_compression.py`), a
 
 ---
 
-## 5. Simulare il "Raspberry Pi virtuale" sul PC
-
-Per rendere credibile l'affermazione "il PC diventa esso stesso un Raspberry
-Pi" senza avere l'hardware:
-
-1. **Limitare le risorse usate dal processo**, per rendere i numeri di
-   latenza/throughput più rappresentativi di un dispositivo embedded:
-   - vincolare l'inferenza a **1 solo core CPU** (`torch.set_num_threads(1)`),
-     rendendo il confronto più onesto rispetto a un laptop multi-core;
-   - forzare `device = "cpu"` sempre (niente GPU/MPS), dato che il Raspberry
-     Pi non ha una GPU CUDA;
-   - misurare RAM/CPU usage con `psutil` durante l'inferenza, da riportare
-     come proxy di "fattibilità su Raspberry Pi" (i modelli Raspberry Pi 4/5
-     hanno 2–8 GB di RAM).
-2. **Mock delle GPIO**: una classe `FakeGPIO` (`actuators/fake_gpio.py`) con la stessa interfaccia di
-   `RPi.GPIO` (`setup()`, `output()`, `input()`), così il codice degli
-   attuatori è immediatamente utilizzabile su hardware reale.
-3. **Comunicazione modulare in-memory (Livello Connectivity & Abstraction)**: i moduli comunicano tramite un'architettura software disaccoppiata basata su dataclass e interfacce ben definite (`SensorReading`, `InferenceResult`, `AgentDecision`). Questo rispecchia fedelmente il livello di astrazione del dato (Livello 5 IoTWF), garantendo leggerezza e rendendo il codice pronto per essere agganciato a un bus reale (es. MQTT) su hardware fisico.
-
----
-
-## 6. Struttura del repository
+## 5. Struttura del repository
 
 ```
 PomodorIA/
@@ -355,9 +332,9 @@ PomodorIA/
 
 ---
 
-## 7. Guida rapida: Installazione e Avvio
+## 6. Guida rapida: Installazione e Avvio
 
-### 7.1 Prerequisiti e Setup dell'ambiente
+### 6.1 Prerequisiti e Setup dell'ambiente
 
 Assicurati di avere Python 3.10+ installato sul tuo sistema. Per configurare l'ambiente isolato e installare tutte le dipendenze:
 
@@ -378,7 +355,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 7.2 Configurazione del Dataset
+### 6.2 Configurazione del Dataset
 
 Prima di avviare il sistema, verifica che il percorso del dataset nel file [`config.yaml`](file:///Users/francescoterrecuso/Desktop/PomodorIA/config.yaml) punti correttamente alla cartella di *PlantVillage-Tomato* presente sul tuo computer:
 
@@ -387,7 +364,7 @@ paths:
   dataset_root: "/percorso/al/tuo/dataset/plantvillage"
 ```
 
-### 7.3 Avvio della Dashboard Real-Time
+### 6.3 Avvio della Dashboard Real-Time
 
 Per avviare la simulazione interattiva della serra domotica con l'interfaccia grafica real-time (Streamlit):
 
@@ -404,7 +381,7 @@ Il comando aprirà automaticamente nel tuo browser la dashboard all'indirizzo **
 
 ---
 
-## 8. Stack tecnologico utilizzato
+## 7. Stack tecnologico utilizzato
 
 | Ambito | Strumenti |
 |---|---|
@@ -417,65 +394,17 @@ Il comando aprirà automaticamente nel tuo browser la dashboard all'indirizzo **
 
 ---
 
-## 9. Roadmap e Fasi Implementate
-
-1. **Setup progetto e Modello Baseline**: struttura del repository, file di configurazione (`config.yaml`), caricamento del checkpoint PyTorch (`CNN_64f-k3-3blk.pth`) e verifica del funzionamento dell'inferenza.
-2. **Sensor Layer**: implementazione della fotocamera virtuale (`VirtualCameraSensor`) con aggancio al dataset e del simulatore di sensori ambientali (`EnvironmentSensorSimulator`) con correlazioni euristiche alle patologie (Data Fusion).
-3. **Edge AI Layer**: sviluppo dell'`InferenceEngine` con supporto per modalità multiple (`full_precision` e `optimized`) e misurazione accurata dei tempi di inferenza.
-4. **Compressione per l'Edge**: realizzazione della suite di compressione (`models/compress.py`) con Unstructured/Structured Pruning, Dynamic Quantization e quantizzazione ONNX Runtime, e salvataggio dei benchmark (`benchmarks/benchmark_results.csv`).
-5. **Actuator Layer**: implementazione dell'infrastruttura di hardware virtuale (`FakeGPIO`) e del banco attuatori (`ActuatorBank`: irrigazione, ventilazione, allarmi LED, notifiche).
-6. **Agente Decisionale PEAS**: sviluppo dell'agente razionale (`DecisionAgent`) basato su regole prioritarie, memoria di stato (arretramento/persistenza allarmi) e logica di Data Fusion.
-7. **Orchestratore e Simulazione Hardware**: implementazione del ciclo integrato sense-think-act (`orchestrator/main_loop.py`) con monitoraggio delle risorse esterne (1 thread CPU, memoria RAM, CPU usage tramite `psutil`).
-8. **Dashboard Real-Time**: realizzazione dell'interfaccia grafica avanzata in Streamlit e Plotly (`dashboard/app_streamlit.py`) per il controllo e la visualizzazione interattiva del sistema della serra domotica.
-
----
-
-## 10. Metriche di valutazione complessive del PoC
-
-- **Metriche ML**: accuracy, precision/recall/F1 per classe (specialmente
-  Early blight e Tomato mosaic virus, già note come critiche), confusion
-  matrix, confronto baseline vs modello compresso.
-- **Metriche di sistema/Edge**: dimensione modello (MB), tempo di inferenza
-  medio (ms), throughput (immagini/secondo), uso di RAM/CPU.
-- **Metriche di comportamento dell'agente**: numero di azioni corrette vs
-  errate rispetto alla "verità" nota dal dataset (es. ha attivato
-  ventilazione quando la classe reale era davvero una fungina?), numero di
-  falsi allarmi.
-
----
-
-## 11. Collegamento con la teoria del corso
-
-- **IoTWF a 7 livelli** → mapping esplicito di ogni componente del PoC (§2).
-- **PEAS e tipologie di agente** → definizione formale dell'agente
-  decisionale (§3.3).
-- **Edge/Fog Computing** → motivazione della compressione del modello: ridurre
-  latenza e non dipendere dal cloud, cruciale in serre spesso in zone con
-  connettività scarsa.
-- **Data Fusion** → combinazione della predizione visiva (CNN) con i dati
-  ambientali per decisioni più robuste.
-- **Smart Agriculture / Precision Farming / Agriculture 4.0** → contesto
-  applicativo generale del progetto, citato esplicitamente nei tuoi appunti.
-- **Sfide IoT (dispositivi vincolati, analisi in tempo reale)** → giustificano
-  sia la scelta della CNN compressa sia l'architettura a cicli sense-think-act.
-
----
-
-## 12. Possibili estensioni
+## 8. Possibili estensioni
 
 - **Federated Learning simulato**: più "serre virtuali" che addestrano
   localmente e aggregano i pesi, richiamando il paradigma citato nei tuoi
   appunti per l'Edge/Federated Learning.
-- **Digital Twin della serra**: rappresentazione virtuale continuamente
-  aggiornata dai dati simulati, con possibilità di "replay" di scenari.
 - **Modello di degrado nel tempo**: simulare l'evoluzione di una malattia
   su più cicli, non solo singoli scatti indipendenti.
-- **Confronto energetico stimato**: stimare il consumo energetico (proxy via
-  FLOPs) di baseline vs modello compresso, per discutere sostenibilità.
 
 ---
 
-## 13. Riferimenti
+## 9. Riferimenti
 
 - Dataset: **PlantVillage — Tomato** (14.529 immagini, 10 classi).
 - Modello: `TomatoCNN` (n_filters=64, kernel_size=3, num_blocks=3),
