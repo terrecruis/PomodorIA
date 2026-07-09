@@ -5,3 +5,11 @@ hideTopBar = true
 [browser]
 # Evita di aprire automaticamente il browser al lancio
 gatherUsageStats = false
+
+[theme]
+# Tema scuro con accento teal, per l'impatto visivo della dashboard
+base = "dark"
+primaryColor = "#00d4aa"
+backgroundColor = "#0e1420"
+secondaryBackgroundColor = "#161d2b"
+textColor = "#e8e8e8"
