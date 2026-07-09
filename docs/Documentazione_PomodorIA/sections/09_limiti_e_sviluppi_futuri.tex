@@ -1,0 +1,76 @@
+\section{Limiti noti e sviluppi futuri}
+\label{sec:limiti}
+
+\subsection{Limiti noti}
+
+In un'ottica di trasparenza scientifica, questa sezione elenca esplicitamente
+i limiti attualmente presenti nel sistema, distinguendo fra limiti
+strutturali (dovuti alla natura di Proof of Concept del progetto) e limiti
+implementativi (potenzialmente risolvibili con sviluppi futuri).
+
+\begin{itemize}
+    \item \textbf{Assenza di hardware fisico}: come discusso nella
+    Sezione~\ref{sec:introduzione}, l'intero sistema è simulato via
+    software. Le misure di latenza e occupazione di memoria, per quanto
+    ottenute vincolando artificialmente le risorse disponibili (un solo
+    thread CPU, nessun acceleratore grafico), restano una stima e non una
+    misura diretta su un dispositivo Raspberry Pi reale.
+    \item \textbf{"Ispezione umana" non bloccante}: come discusso nella
+    Sezione~\ref{sec:agent-layer}, la regola dell'agente che richiede
+    l'intervento umano in caso di bassa confidenza del modello si traduce,
+    nell'implementazione attuale, in una notifica simbolica che non arresta
+    il ciclo automatico in attesa di un riscontro effettivo.
+    \item \textbf{Sensori ambientali simulati tramite profili statistici}: i
+    valori di temperatura, umidità e luminosità, pur calibrati su
+    conoscenza botanica reale (Sezione~\ref{sec:moduli}), sono generati da
+    distribuzioni statistiche predefinite e non da misurazioni fisiche
+    effettive.
+    \item \textbf{Soglie decisionali definite manualmente}: le soglie
+    utilizzate dall'agente (confidenza minima, umidità massima, ecc.) sono
+    valori di configurazione scelti secondo criteri di buon senso
+    progettuale, non calibrati tramite un'analisi statistica formale dei
+    dati (ad esempio un'ottimizzazione della soglia di confidenza rispetto
+    al tasso di errore osservato sul test set).
+\end{itemize}
+
+\subsection{Sviluppi futuri}
+
+Il progetto si presta naturalmente ad alcune estensioni, alcune delle quali
+già delineate in fase di progettazione:
+
+\begin{itemize}
+    \item \textbf{Implementazione di un vero meccanismo di human-in-the-loop}:
+    introdurre un punto di blocco effettivo nel ciclo (ad esempio un
+    comando da tastiera nella versione CLI, o un pulsante di
+    conferma/rifiuto nella dashboard) quando la confidenza del modello è
+    sotto soglia, sospendendo l'avanzamento automatico del ciclo fino a un
+    riscontro esplicito dell'operatore.
+    \item \textbf{Deployment su hardware reale}: grazie alla progettazione a
+    interfacce intercambiabili (in particolare il modulo
+    \texttt{fake\_gpio.py}, pensato come sostituto diretto della libreria
+    ufficiale \texttt{RPi.GPIO}), il passaggio a un Raspberry Pi fisico, con
+    fotocamera e sensori reali, richiederebbe la sola sostituzione dei
+    moduli di I/O di livello fisico, mantenendo inalterata la logica
+    applicativa (motore di inferenza, agente decisionale, orchestratore).
+    \item \textbf{Federated Learning simulato}: estendere il PoC a più
+    "serre virtuali" indipendenti che addestrano localmente una copia del
+    modello e periodicamente aggregano i pesi appresi, un paradigma
+    rilevante per scenari IoT distribuiti in cui i dati non possono o non
+    devono essere centralizzati.
+    \item \textbf{Digital Twin della serra}: costruire una rappresentazione
+    virtuale continuamente aggiornata dallo stato del sistema, con la
+    possibilità di rieseguire ("replay") scenari storici per analisi o
+    dimostrazioni.
+    \item \textbf{Calibrazione statistica delle soglie decisionali}:
+    determinare le soglie operative dell'agente (in particolare la soglia
+    di confidenza minima) analizzando la distribuzione delle confidenze
+    associate alle predizioni corrette e a quelle errate sul test set, per
+    minimizzare in modo più rigoroso il compromesso fra falsi allarmi e
+    diagnosi mancate.
+    \item \textbf{Stima del consumo energetico}: affiancare alle metriche
+    già raccolte (dimensione, latenza, accuratezza) una stima del consumo
+    energetico delle diverse varianti del modello, ad esempio tramite il
+    conteggio delle operazioni in virgola mobile (FLOPs), per arricchire la
+    discussione sulla sostenibilità del deployment Edge rispetto a
+    un'alternativa basata su inferenza in cloud.
+\end{itemize}

@@ -1,0 +1,85 @@
+\section{Risultati sperimentali}
+\label{sec:risultati}
+
+\subsection{Confronto fra le varianti del modello}
+
+La Tabella~\ref{tab:benchmark-finale} riporta i risultati del confronto
+sperimentale fra il modello originale e le tre varianti compresse,
+misurati sul test set corretto (Sezione~\ref{sec:compressione}) tramite la
+suite di benchmark automatizzata (\texttt{benchmarks/benchmark\_compression.py}),
+eseguita a valle della risoluzione delle problematiche tecniche descritte
+nella sezione precedente.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Variante} & \textbf{Accuracy} & \textbf{Dimensione} & \textbf{Latenza media} \\
+\midrule
+Baseline (float32) & 95,0\% & 33,44 MB & 3,33 ms \\
+Pruned (sparsità 30\%) & 82,2\% & 33,44 MB & 3,28 ms \\
+Pruned + Quantized (INT8) & 82,2\% & 9,43 MB & 4,32 ms \\
+ONNX Quantized (INT8) & 95,0\% & 8,37 MB & 6,10 ms \\
+\bottomrule
+\end{tabular}
+\caption{Confronto sperimentale fra baseline e varianti compresse, sul test set corretto.}
+\label{tab:benchmark-finale}
+\end{table}
+
+\subsection{Interpretazione dei risultati}
+
+I risultati permettono di trarre alcune conclusioni rilevanti sul
+trade-off fra le diverse tecniche di compressione applicate a questa
+specifica architettura:
+
+\begin{itemize}
+    \item \textbf{La sola quantizzazione (variante ONNX) preserva quasi
+    completamente l'accuratezza}, riducendo comunque la dimensione del
+    modello di un fattore $\sim$4. Questo risultato è coerente con la
+    composizione dell'architettura: \texttt{TomatoCNN} è dominata da strati
+    convoluzionali (\texttt{Conv2d}), sui quali la quantizzazione dinamica
+    ha un impatto contenuto sulla precisione numerica rispetto a quanto
+    avverrebbe su architetture dominate da strati completamente connessi.
+    \item \textbf{Il pruning strutturato al 30\% introduce una perdita di
+    accuratezza significativa} (da 95,0\% a 82,2\%), a fronte di
+    \emph{nessuna} riduzione di dimensione su disco, poiché i pesi azzerati
+    non vengono automaticamente compattati in un formato più efficiente
+    senza un'ulteriore fase di conversione. Questo evidenzia come il
+    pruning, da solo, non sia sufficiente a ottenere benefici pratici senza
+    una tecnica di serializzazione dedicata ai formati sparsi.
+    \item \textbf{La combinazione pruning + quantizzazione} produce il file
+    più compatto fra le due varianti PyTorch (9,43 MB), ma eredita
+    interamente la perdita di accuratezza introdotta dal pruning
+    (82,2\%), risultando la variante col trade-off meno favorevole fra le
+    tre, a meno che il vincolo di memoria del dispositivo target non sia
+    particolarmente stringente.
+    \item Le \textbf{latenze misurate} risultano tutte dello stesso ordine
+    di grandezza (3--6 millisecondi per singola inferenza), un dato atteso
+    data la ridotta dimensione della rete; le differenze osservate fra le
+    varianti non sono quindi determinanti nella scelta della configurazione
+    da adottare per questo specifico modello, mentre lo sarebbero per
+    architetture più profonde e con un numero di parametri maggiore.
+\end{itemize}
+
+In sintesi, per questa specifica architettura e questo specifico compito di
+classificazione, \textbf{la quantizzazione via ONNX Runtime rappresenta la
+scelta più equilibrata}, offrendo una riduzione di dimensione significativa
+a fronte di una perdita di accuratezza trascurabile; il pruning strutturato,
+pur essendo una tecnica rilevante in architetture più grandi o con maggiore
+ridondanza nei filtri, in questo caso specifico penalizza l'accuratezza in
+modo più marcato di quanto benefici in termini di prestazioni.
+
+\subsection{Metriche di comportamento dell'agente}
+
+Oltre alle metriche puramente relative al modello di classificazione, il
+sistema misura anche il comportamento dell'agente decisionale nel suo
+complesso: numero di cicli eseguiti, numero di rilevamenti di malattia
+consecutivi, e \emph{behavior accuracy} (la frazione di decisioni
+dell'agente coerenti con la classe reale nota dal dataset). Queste metriche,
+consultabili sia nel log CSV prodotto dall'orchestratore da riga di comando
+sia nella dashboard interattiva, permettono di valutare non solo la qualità
+della singola predizione della CNN, ma la correttezza del comportamento
+del sistema nel suo complesso (ad esempio, se l'attivazione della
+ventilazione sia realmente avvenuta in presenza di condizioni favorevoli a
+una patologia fungina).

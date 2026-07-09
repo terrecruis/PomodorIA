@@ -1,0 +1,165 @@
+\section{Compressione del modello per l'Edge}
+\label{sec:compressione}
+
+\subsection{Motivazione}
+
+Un dispositivo Edge a risorse limitate come un Raspberry Pi dispone di
+qualche gigabyte di RAM e di una CPU priva di acceleratore grafico dedicato.
+Eseguire su un simile dispositivo un modello di Deep Learning nella sua
+forma originale (33,44 MB, precisione a 32 bit per ogni parametro) è
+possibile ma non ottimale in termini di occupazione di memoria e velocità di
+risposta. La pipeline di compressione, implementata nello script standalone
+\texttt{models/compress.py} (da eseguire manualmente e non richiamato
+automaticamente dal ciclo principale), applica e confronta tre approcci
+distinti.
+
+\subsection{Pruning strutturato}
+
+Il \emph{pruning} ("potatura") individua i filtri convoluzionali che
+contribuiscono meno alla predizione finale (valutati tramite la norma L1 dei
+rispettivi pesi) e li rimuove. Il progetto adotta lo \emph{structured
+pruning}: a differenza del pruning non strutturato (che azzera singoli pesi
+sparsi, senza ridurre effettivamente il numero di operazioni), il pruning
+strutturato rimuove interi filtri, riducendo concretamente sia la dimensione
+del modello sia il numero di operazioni da eseguire durante l'inferenza su
+CPU. Nel progetto è stata applicata una sparsità del 30\% sui livelli
+convoluzionali.
+
+\subsection{Quantizzazione}
+
+La \emph{quantizzazione} converte i pesi del modello dalla rappresentazione
+a 32 bit in virgola mobile (float32) a una rappresentazione compatta a 8 bit
+intera (INT8), riducendo la dimensione occupata di un fattore prossimo a 4
+e velocizzando i calcoli su CPU prive di unità di calcolo dedicate al
+floating point ad alta precisione. Il progetto ha sperimentato due percorsi
+di quantizzazione:
+
+\begin{itemize}
+    \item \textbf{Dynamic quantization} in PyTorch: converte i pesi in INT8
+    in anticipo, mentre le attivazioni (i dati che attraversano la rete
+    durante l'inferenza) vengono quantizzate dinamicamente ad ogni
+    esecuzione. È l'approccio più semplice e universalmente supportato, non
+    richiede una fase di calibrazione.
+    \item \textbf{Quantizzazione dinamica via ONNX Runtime}: il modello
+    viene prima esportato in formato \textbf{ONNX} (\emph{Open Neural
+    Network Exchange}), uno standard indipendente dal framework di
+    provenienza che descrive sia il grafo computazionale sia i pesi in un
+    unico file binario, eseguibile da un motore dedicato all'inferenza
+    (\emph{ONNX Runtime}), tipicamente più efficiente di un framework di
+    training generico come PyTorch quando utilizzato in sola inferenza. Il
+    modello ONNX viene poi quantizzato con lo strumento
+    \texttt{onnxruntime.quantization}.
+\end{itemize}
+
+La \emph{Post-Training Static Quantization} (PTQ statica), che quantizza
+anche le attivazioni in anticipo tramite una fase di calibrazione su un
+piccolo insieme di immagini di esempio, è stata valutata ma risultava
+instabile sulla piattaforma di sviluppo (macOS con processore Apple
+Silicon); si è pertanto optato per la quantizzazione dinamica, più robusta
+e portabile.
+
+\subsection{Le tre varianti compresse generate}
+
+La pipeline produce tre varianti compresse distinte, ciascuna risultato di
+una combinazione diversa delle tecniche precedenti, riassunte in
+Tabella~\ref{tab:varianti-compresse}.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}p{2.6cm}p{4.4cm}p{5.6cm}@{}}
+\toprule
+\textbf{Variante} & \textbf{File generato} & \textbf{Tecnica applicata} \\
+\midrule
+\texttt{onnx} & \texttt{model\_quantized.onnx} & Sola quantizzazione dinamica INT8, tramite ONNX Runtime, sul modello originale non potato \\
+\texttt{pruned\_quantized} & \texttt{model\_pruned\_quantized.pth} & Pruning strutturato (30\%) + quantizzazione dinamica INT8, in PyTorch \\
+\texttt{pruned} & \texttt{model\_pruned.pth} & Solo pruning strutturato (30\%), pesi ancora in float32 \\
+\bottomrule
+\end{tabular}
+\caption{Le tre varianti compresse prodotte dalla pipeline di \texttt{compress.py}.}
+\label{tab:varianti-compresse}
+\end{table}
+
+Il motore di inferenza (\texttt{InferenceEngine}) può caricare una qualsiasi
+di queste varianti in base alla configurazione
+(\texttt{model.optimized\_variant} in \texttt{config.yaml}, oppure
+selezionabile direttamente dalla dashboard), rendendo possibile un confronto
+sperimentale diretto, i cui risultati sono riportati nella
+Sezione~\ref{sec:risultati}.
+
+\subsection{Problematiche tecniche incontrate e risolte}
+
+Nel corso dello sviluppo sono emerse, e sono state diagnosticate e risolte,
+alcune problematiche tecniche non banali, che vale la pena documentare
+poiché rappresentano un aspetto significativo del lavoro di ingegnerizzazione
+del progetto, oltre alla sola implementazione della pipeline "sul caso
+ideale".
+
+\subsubsection{Data leakage nella valutazione dell'accuratezza}
+
+Nella prima versione del sistema, la fotocamera virtuale campionava
+immagini dall'intero dataset PlantVillage-Tomato, incluso il sottoinsieme
+utilizzato per l'addestramento della rete nel progetto originario. Questo
+comportamento, noto in letteratura come \emph{data leakage}, produceva
+un'accuratezza osservata prossima al 100\%, non rappresentativa della reale
+capacità di generalizzazione del modello, poiché la CNN si trovava spesso a
+classificare immagini già osservate durante il proprio addestramento. Il
+problema è stato risolto scrivendo uno script dedicato
+(\texttt{scripts/extract\_test\_set.py}) che ricostruisce esattamente lo
+split casuale (\texttt{seed=42}, proporzione 80/20) utilizzato nel progetto
+di training originale, isolando così il 20\% di immagini realmente escluse
+dall'addestramento (2.906 immagini su un totale di 14.529), e configurando
+la fotocamera virtuale affinché attinga esclusivamente da questo
+sottoinsieme. Dopo la correzione, l'accuratezza osservata sul modello
+originale si è attestata al 97,67\% su un campione di verifica di 300
+immagini, valore coerente con quanto misurato nel progetto di training
+originale.
+
+\subsubsection{Fallimento silenzioso della quantizzazione ONNX}
+
+Durante la verifica sperimentale delle diverse varianti compresse, si è
+osservato che la variante \texttt{onnx} restituiva un'accuratezza
+\emph{identica, bit per bit}, a quella del modello originale non
+compresso -- un risultato sospetto, poiché una quantizzazione reale, per
+quanto conservativa, introduce sempre una minima perdita di precisione
+numerica. L'ispezione diretta del file \texttt{model\_quantized.onnx} ha
+rivelato che esso era, di fatto, una copia identica del modello non
+quantizzato. La causa risiedeva in un'eccezione sollevata internamente da
+\texttt{onnxruntime.quantization.quantize\_dynamic()} durante l'esportazione
+del grafo ONNX, generato con l'esportatore "dynamo" di PyTorch (diventato
+predefinito nelle versioni recenti del framework): tale esportatore produce,
+per l'operazione di \emph{flatten} presente nell'architettura
+(\texttt{x.view(x.size(0), -1)}), un grafo con un'incoerenza nell'inferenza
+automatica delle dimensioni dei tensori, che fa fallire il passo di
+quantizzazione. Il codice della pipeline, intercettando genericamente
+l'eccezione con un blocco \texttt{try/except}, ripiegava silenziosamente
+sulla copia del modello non quantizzato, mascherando così il problema. La
+correzione è consistita nel forzare l'utilizzo dell'esportatore ONNX
+"legacy" (basato su TorchScript, tramite il parametro
+\texttt{dynamo=False} di \texttt{torch.onnx.export}), risolvendo
+l'incompatibilità e ottenendo una quantizzazione realmente funzionante
+(dimensione del file ridotta da 33,44 MB a 8,37 MB, con accuratezza
+sostanzialmente invariata).
+
+\subsubsection{Backend di quantizzazione non inizializzato}
+
+Un secondo problema, di natura simile, si presentava nel caricamento della
+variante \texttt{pruned\_quantized}: il caricamento del checkpoint
+PyTorch quantizzato falliva con l'errore \texttt{RuntimeError: Unknown
+qengine}. La causa era l'assenza, nel motore di inferenza,
+dell'impostazione esplicita del \emph{backend di quantizzazione}
+(\texttt{torch.backends.quantized.engine}), un parametro globale di PyTorch
+che deve essere impostato coerentemente sia in fase di creazione sia in
+fase di caricamento di un modello quantizzato. Il problema è stato risolto
+impostando esplicitamente il backend appropriato (\texttt{qnnpack} su
+architetture ARM/Apple Silicon, \texttt{fbgemm} su x86) all'importazione del
+modulo di inferenza.
+
+\begin{notebox}
+La documentazione di entrambe le correzioni non ha valore puramente
+tecnico: dimostra un processo di verifica sperimentale rigoroso, in cui i
+risultati numerici non sono stati accettati acriticamente ma confrontati e
+messi in discussione quando apparivano statisticamente sospetti (accuratezza
+identica fra baseline e modello quantizzato), portando all'identificazione
+di problemi altrimenti silenti nella pipeline.
+\end{notebox}

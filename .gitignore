@@ -51,6 +51,6 @@ ehthumbs.db
 *.tmp
 
 # ─── Documentazione personale (Overleaf) ───
-docs/
+docs/Spiegazione_PomodorIA.tex
 
 plantvillage_testset/

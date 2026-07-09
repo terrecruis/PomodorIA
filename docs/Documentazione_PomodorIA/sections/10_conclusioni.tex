@@ -1,0 +1,40 @@
+\section{Conclusioni}
+\label{sec:conclusioni}
+
+Il progetto PomodorIA ha dimostrato, tramite un Proof of Concept interamente
+software, la realizzabilità concettuale e pratica di un sistema di Edge AI
+applicato alla Smart Agriculture, seguendo l'intero ciclo di vita che un
+simile sistema affronterebbe in un contesto reale: dalla scelta e
+validazione di un modello di Deep Learning appropriato al compito (Sezione
+\ref{sec:modello-ml}), alla sua compressione per un ipotetico deployment su
+hardware a risorse limitate (Sezione~\ref{sec:compressione}), fino
+all'integrazione in un sistema completo di sensori, attuatori e un agente
+decisionale razionale, formalizzato secondo il modello PEAS e collegato
+esplicitamente ai concetti teorici del corso di Internet of Things
+(Sezione~\ref{sec:contesto}).
+
+Il lavoro svolto non si è limitato all'implementazione della pipeline nel
+suo funzionamento atteso, ma ha incluso un processo di verifica
+sperimentale che ha portato all'identificazione e alla risoluzione di
+problematiche tecniche non evidenti a un primo sguardo (il \emph{data
+leakage} nella valutazione dell'accuratezza e il fallimento silenzioso della
+quantizzazione ONNX, discussi nella Sezione~\ref{sec:compressione}),
+un aspetto che riteniamo rappresenti un valore aggiunto significativo
+rispetto alla sola esecuzione di una pipeline preconfezionata.
+
+I risultati sperimentali ottenuti (Sezione~\ref{sec:risultati}) evidenziano
+come, per l'architettura convoluzionale relativamente compatta utilizzata in
+questo progetto, la quantizzazione risulti la tecnica di compressione più
+efficace, offrendo una riduzione della dimensione del modello di circa
+quattro volte a fronte di una perdita di accuratezza trascurabile, mentre il
+pruning strutturato, pur concettualmente rilevante, introduce in questo
+caso specifico un compromesso meno favorevole.
+
+Il progetto, pur trattandosi di una simulazione priva di hardware fisico,
+è stato progettato secondo principi di ingegneria del software che ne
+renderebbero possibile l'estensione verso un deployment reale con un
+impatto limitato sulla logica applicativa, e apre a numerose direzioni di
+sviluppo futuro discusse nella Sezione~\ref{sec:limiti}, dal
+Federated Learning al Digital Twin, che confermano la validità del sistema
+progettato come base per esplorazioni più ampie nell'ambito dell'Edge AI
+per l'Internet of Things.

@@ -1,0 +1,124 @@
+\section{Architettura del sistema}
+\label{sec:architettura}
+
+\subsection{Il ciclo sense-think-act-log}
+
+Il filo conduttore dell'intera architettura è un ciclo continuo, ispirato al
+paradigma degli agenti razionali e dei sistemi robotici/IoT, articolato in
+quattro fasi che si ripetono indefinitamente:
+
+\begin{itemize}
+    \item \textbf{SENSE} (percepisci): un sensore visivo virtuale acquisisce
+    un'immagine di una foglia, un sensore ambientale virtuale rileva
+    temperatura, umidità dell'aria, umidità del suolo e luminosità.
+    \item \textbf{THINK} (pensa): la CNN classifica l'immagine, l'agente
+    decisionale combina la diagnosi con i dati ambientali e decide le azioni
+    da intraprendere.
+    \item \textbf{ACT} (agisci): gli attuatori virtuali (pompa di
+    irrigazione, ventola, allarme, notifica) vengono attivati o disattivati
+    in base alla decisione.
+    \item \textbf{LOG} (registra): l'esito del ciclo (predizione, confidenza,
+    dati ambientali, azioni intraprese, metriche di performance) viene
+    registrato per l'analisi successiva.
+\end{itemize}
+
+La Figura~\ref{fig:diagramma-blocchi} illustra il flusso dei dati fra i
+componenti software che realizzano questo ciclo.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+    box/.style={draw, rounded corners, minimum width=3.6cm, minimum height=1.1cm,
+        align=center, fill=pomodoroTeal!8, draw=pomodoroTeal, thick, font=\small},
+    node distance=1.4cm and 1.8cm,
+    arrow/.style={-{Stealth[length=2.5mm]}, thick, pomodoroDark},
+]
+\node[box] (camera) {Sensor Layer\\\footnotesize Virtual Camera + Env. Simulator};
+\node[box, right=of camera] (edge) {Edge AI Layer\\\footnotesize Inference Engine (CNN compressa)};
+\node[box, right=of edge] (act) {Actuator Layer\\\footnotesize Irrigazione / Ventola / Allarme};
+
+\node[box, below=of edge, fill=pomodoroPurple!8, draw=pomodoroPurple] (agent) {Agente Decisionale\\\footnotesize Regole PEAS + Data Fusion};
+\node[box, below=of agent, fill=pomodoroAmber!10, draw=pomodoroAmber] (log) {Logging / Dashboard};
+
+\draw[arrow] (camera) -- (edge);
+\draw[arrow] (edge) -- (act);
+\draw[arrow] (edge) -- (agent);
+\draw[arrow] (camera) -- (agent);
+\draw[arrow] (agent) -- (act);
+\draw[arrow] (agent) -- (log);
+\end{tikzpicture}
+\caption{Schema a blocchi del flusso sense-think-act-log in PomodorIA.}
+\label{fig:diagramma-blocchi}
+\end{figure}
+
+\subsection{Mapping sui sette livelli IoTWF}
+
+La Tabella~\ref{tab:iotwf} mappa esplicitamente ogni livello del modello
+IoT World Forum (Sezione~\ref{sec:iotwf}) sul relativo componente software
+del progetto, distinguendo fra ciò che accadrebbe in un deployment reale su
+Raspberry Pi e ciò che è stato effettivamente implementato nel PoC.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}p{2.6cm}p{5.6cm}p{5.6cm}@{}}
+\toprule
+\textbf{Livello IoTWF} & \textbf{Deployment reale (target)} & \textbf{Implementazione nel PoC} \\
+\midrule
+1. Physical Devices \& Controllers &
+Fotocamera, sensori DHT22/igrometro, pompa, ventola &
+Moduli Python mock: \texttt{VirtualCameraSensor}, \texttt{EnvironmentSensorSimulator}, \texttt{FakeGPIO} \\
+2. Connectivity &
+Wi-Fi del Raspberry Pi &
+Comunicazione in-memory fra moduli Python \\
+3. Edge (Fog) Computing &
+Inferenza CNN quantizzata sul Raspberry Pi &
+Inferenza CNN compressa su CPU, con vincoli di risorse simulati (1 core, no GPU) \\
+4. Data Accumulation &
+Storage locale su SD card &
+Log strutturati su file CSV \\
+5. Data Abstraction &
+Normalizzazione dei dati per il livello applicativo &
+Strutture dati tipizzate (\texttt{dataclass}): \texttt{SensorReading}, \texttt{InferenceResult}, \texttt{AgentDecision} \\
+6. Application &
+Dashboard di monitoraggio &
+Dashboard interattiva real-time (Streamlit + Plotly) \\
+7. Collaboration \& Processes &
+Notifiche all'agricoltore, integrazione gestionale &
+Notifiche e allarmi generati dall'agente e mostrati nell'interfaccia \\
+\bottomrule
+\end{tabular}
+\caption{Mapping dell'architettura di PomodorIA sui sette livelli IoTWF.}
+\label{tab:iotwf}
+\end{table}
+
+\subsection{Le due modalità di esecuzione}
+
+Il ciclo sense-think-act-log può essere eseguito da due programmi
+alternativi, che orchestrano esattamente gli stessi cinque componenti di
+dominio (fotocamera, sensori ambientali, motore di inferenza, agente
+decisionale, banco attuatori), differenziandosi solo per l'interfaccia con
+l'utente e per la modalità di persistenza dei risultati.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}p{3.4cm}p{5.6cm}p{5.6cm}@{}}
+\toprule
+& \textbf{\texttt{orchestrator/main\_loop.py}} & \textbf{\texttt{dashboard/app\_streamlit.py}} \\
+\midrule
+Interfaccia & Riga di comando (terminale) & Interfaccia web interattiva (browser) \\
+Meccanismo del ciclo & Ciclo infinito nativo Python (\texttt{while True}) & Un ciclo per ogni \emph{rerun} di Streamlit, pilotato da un timer software \\
+Persistenza & File CSV strutturato in \texttt{logs/} & Cronologia mantenuta in memoria (\texttt{st.session\_state}), persa alla chiusura \\
+Caso d'uso tipico & Raccolta dati per analisi statistica offline (es. su molti cicli) & Dimostrazione interattiva e monitoraggio in tempo reale (es. in sede di esame) \\
+\bottomrule
+\end{tabular}
+\caption{Confronto fra le due modalità di esecuzione del sistema.}
+\label{tab:driver-confronto}
+\end{table}
+
+Questa duplicazione non introduce alcuna duplicazione di logica applicativa:
+entrambi i programmi si limitano a istanziare gli stessi cinque componenti e
+a richiamarli nello stesso ordine, garantendo che il comportamento del
+sistema osservato da terminale e quello osservato dalla dashboard siano
+concettualmente equivalenti.

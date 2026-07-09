@@ -1,0 +1,117 @@
+% ══════════════════════════════════════════════════════════════
+% Preambolo — PomodorIA, Documentazione di Progetto
+% ══════════════════════════════════════════════════════════════
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[italian]{babel}
+\usepackage{geometry}
+\geometry{a4paper, top=2.8cm, bottom=2.8cm, left=2.6cm, right=2.6cm}
+
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{parskip}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds}
+\usepackage{caption}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins,breakable}
+
+% ── Palette colori del progetto (coerente con la dashboard PomodorIA) ──
+\definecolor{pomodoroTeal}{HTML}{00897B}
+\definecolor{pomodoroPurple}{HTML}{5E4AE3}
+\definecolor{pomodoroAmber}{HTML}{C97A1A}
+\definecolor{pomodoroRed}{HTML}{C0392B}
+\definecolor{pomodoroGreen}{HTML}{1E8449}
+\definecolor{pomodoroDark}{HTML}{0E1420}
+\definecolor{codebg}{RGB}{246,246,248}
+\definecolor{codekw}{HTML}{00897B}
+\definecolor{notebg}{HTML}{EAF6F3}
+\definecolor{notebd}{HTML}{00897B}
+\definecolor{warnbg}{HTML}{FDF1E3}
+\definecolor{warnbd}{HTML}{C97A1A}
+
+% ── Codice sorgente ──
+\lstset{
+    backgroundcolor=\color{codebg},
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{codekw}\bfseries,
+    commentstyle=\color{gray}\itshape,
+    stringstyle=\color{pomodoroRed},
+    breaklines=true,
+    breakatwhitespace=false,
+    frame=single,
+    rulecolor=\color{black!15},
+    language=Python,
+    tabsize=4,
+    showstringspaces=false,
+    xleftmargin=1em,
+    xrightmargin=1em,
+}
+
+% ── Box informativi (nota / attenzione) ──
+\newtcolorbox{notebox}[1][]{
+    enhanced, breakable, colback=notebg, colframe=notebd,
+    boxrule=0.6pt, left=8pt, right=8pt, top=6pt, bottom=6pt,
+    title={\textbf{Nota}}, fonttitle=\bfseries\color{notebd},
+    attach boxed title to top left={xshift=8pt, yshift=-2mm},
+    boxed title style={colback=notebg, boxrule=0pt},
+    #1
+}
+\newtcolorbox{warnbox}[1][]{
+    enhanced, breakable, colback=warnbg, colframe=warnbd,
+    boxrule=0.6pt, left=8pt, right=8pt, top=6pt, bottom=6pt,
+    title={\textbf{Attenzione}}, fonttitle=\bfseries\color{warnbd},
+    attach boxed title to top left={xshift=8pt, yshift=-2mm},
+    boxed title style={colback=warnbg, boxrule=0pt},
+    #1
+}
+
+% ── Link ──
+\hypersetup{
+    colorlinks=true,
+    linkcolor=pomodoroPurple,
+    citecolor=pomodoroTeal,
+    urlcolor=pomodoroTeal,
+    pdftitle={PomodorIA - Documentazione di Progetto},
+    pdfauthor={Gianmarco Vellotti, Francesco Terrecuso},
+}
+
+% ── Titoli delle sezioni: stile "numero | Titolo" in small caps, con
+%    ogni sezione di primo livello che parte da una nuova pagina ──
+\titleformat{\section}
+    {\clearpage\normalfont\Huge\scshape\color{pomodoroDark}}
+    {\thesection\hspace{10pt}{\color{pomodoroTeal}\Large\textbar}\hspace{10pt}}
+    {0pt}
+    {}
+\titlespacing*{\section}{0pt}{0pt}{28pt}
+
+\titleformat{\subsection}
+    {\normalfont\Large\bfseries\color{pomodoroDark}}
+    {\thesubsection}{10pt}{}
+\titlespacing*{\subsection}{0pt}{18pt}{10pt}
+
+\titleformat{\subsubsection}
+    {\normalfont\large\bfseries\color{pomodoroTeal}}
+    {\thesubsubsection}{8pt}{}
+\titlespacing*{\subsubsection}{0pt}{14pt}{6pt}
+
+% ── Intestazione/piè di pagina ──
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancyhead[L]{\small\itshape PomodorIA --- Documentazione di Progetto}
+\fancyhead[R]{\small\itshape\leftmark}
+\fancyfoot[C]{\small\thepage}
+
+\renewcommand{\arraystretch}{1.25}
+\setlist[itemize]{topsep=4pt, itemsep=2pt}
+\setlist[enumerate]{topsep=4pt, itemsep=2pt}
