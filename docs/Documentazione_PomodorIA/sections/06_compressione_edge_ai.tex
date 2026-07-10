@@ -54,27 +54,10 @@ in anticipo, le attivazioni (i dati che attraversano la rete durante
 l'inferenza) vengono quantizzate al volo ad ogni esecuzione, senza bisogno
 di una fase di calibrazione su dati di esempio. È applicata per due strade
 distinte: direttamente in PyTorch, oppure dopo aver esportato il modello in
-formato \textbf{ONNX}\footnote{\emph{Open Neural Network Exchange}: un
-formato standard, indipendente dal framework di provenienza, che descrive
-sia il grafo di calcolo che i pesi in un unico file, eseguibile da un
-motore dedicato all'inferenza (\emph{ONNX Runtime}), spesso più veloce di
-un framework di training generico se usato in sola inferenza.} e
-quantizzato con \texttt{onnxruntime.quantization}~[\ref{bib:onnx}].
-
-Durante lo sviluppo, la quantizzazione ONNX ha fallito silenziosamente: la
-libreria di quantizzazione si aspettava un grafo con una precisa struttura
-interna, e l'esportatore ONNX più recente di PyTorch (di default nelle
-versioni aggiornate del framework) produce per questa rete un grafo con una
-forma leggermente diversa da quella prevista, che fa fallire il passo di
-quantizzazione. Il problema era mascherato da un blocco di gestione errori
-troppo generico, che in caso di fallimento si limitava a copiare il
-modello non quantizzato senza segnalarlo -- lo si è scoperto solo
-confrontando i risultati: un modello "quantizzato" con accuratezza
-\emph{identica, bit per bit}, alla versione originale non è plausibile. La
-correzione è stata forzare l'esportatore ONNX nella sua modalità
-precedente ("legacy"), compatibile con la libreria di quantizzazione,
-riportando la dimensione del file da 33,44 MB a 8,37 MB con accuratezza
-sostanzialmente invariata.
+formato \textbf{ONNX}\footnote{\emph{ONNX}: formato standard indipendente
+dal framework che rappresenta grafo e pesi in un unico file, eseguibile con
+\emph{ONNX Runtime}, spesso più efficiente in inferenza.} e quantizzato con
+\texttt{onnxruntime.quantization}~[\ref{bib:onnx}].
 
 \subsection{Le tre varianti compresse generate}
 
@@ -85,12 +68,12 @@ o dalla dashboard.
 \begin{table}[h]
 \centering
 \small
-\begin{tabular}{@{}p{2.4cm}p{3.6cm}p{6.4cm}@{}}
+\begin{tabular}{@{}p{2.8cm}p{3.4cm}p{6.2cm}@{}}
 \toprule
 \textbf{Variante} & \textbf{File generato} & \textbf{Tecnica applicata} \\
 \midrule
-\texttt{onnx} & \seqsplit{model\_quantized.onnx} & Sola quantizzazione dinamica INT8 (ONNX Runtime), sul modello originale non potato \\
-\texttt{pruned\_quantized} & \seqsplit{model\_pruned\_quantized.pth} & Pruning strutturato (30\%) + quantizzazione dinamica INT8, in PyTorch \\
+\texttt{onnx} & \seqsplit{model\_quantized.onnx} & Sola quantizzazione dinamica INT8 (ONNX Runtime), sul modello originale non potato \\[4pt]
+\seqsplit{\texttt{pruned\_quantized}} & \seqsplit{model\_pruned\_quantized.pth} & Pruning strutturato (30\%) + quantizzazione dinamica INT8, in PyTorch \\[4pt]
 \texttt{pruned} & \seqsplit{model\_pruned.pth} & Solo pruning strutturato (30\%), pesi ancora in float32 \\
 \bottomrule
 \end{tabular}

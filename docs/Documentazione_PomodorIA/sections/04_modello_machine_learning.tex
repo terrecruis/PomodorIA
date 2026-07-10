@@ -4,35 +4,10 @@
 \subsection{Origine, dataset e scelta architetturale}
 
 Il modello di riconoscimento utilizzato in PomodorIA non è stato addestrato
-da zero nell'ambito di questo progetto, ma riutilizza il lavoro svolto in un
-esame precedente~[\ref{bib:cnntomato}], in cui è stata confrontata
-sperimentalmente una rete completamente connessa (FCNN) con una rete
-convoluzionale (CNN) sul dataset \textbf{PlantVillage -- Tomato}~[\ref{bib:dataset}]
-(14.529 immagini, 10 classi: 9 patologie fogliari più la classe "sana").
-
-La Tabella~\ref{tab:fcnn-vs-cnn} riassume l'esito di quel confronto, che ha
-motivato la scelta della CNN come modello da portare in produzione nel
-sistema Edge: una rete completamente connessa tratta l'immagine come un
-vettore piatto di pixel, perdendo l'informazione sulla struttura spaziale, e
-per questo confonde più facilmente patologie visivamente simili; la CNN,
-grazie ai filtri convoluzionali, cattura pattern spaziali locali (bordi,
-texture, forma delle macchie fogliari) risultando nettamente più accurata.
-
-\begin{table}[h]
-\centering
-\small
-\begin{tabular}{@{}p{4.6cm}p{4.2cm}p{4.2cm}@{}}
-\toprule
-& \textbf{FCNN [2L-512-ReLU]} & \textbf{CNN [64f-k3-3blk]} \\
-\midrule
-Accuracy (holdout 80/20) & $\sim$84\% & $\sim$96\% \\
-Recall minimo per classe & 0,69 (Target Spot) & 0,90 \\
-Punto debole & Confonde patologie fungine simili & Classi rare più critiche \\
-\bottomrule
-\end{tabular}
-\caption{Confronto tra rete completamente connessa (FCNN) e rete convoluzionale (CNN).}
-\label{tab:fcnn-vs-cnn}
-\end{table}
+da zero nell'ambito di questo progetto, ma proviene da un esame
+precedente~[\ref{bib:cnntomato}]: una rete convoluzionale (CNN) allenata sul
+dataset \textbf{PlantVillage -- Tomato}~[\ref{bib:dataset}] (14.529 immagini,
+10 classi: 9 patologie fogliari più la classe "sana").
 
 \subsection{Architettura della CNN: \texttt{TomatoCNN}}
 

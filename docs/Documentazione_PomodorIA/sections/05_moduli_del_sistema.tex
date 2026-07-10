@@ -62,28 +62,12 @@ un dispositivo Edge limitando l'esecuzione a un solo thread CPU, senza GPU.
 \subsection{Agent Layer}
 \label{sec:agent-layer}
 
-Il modulo \texttt{agent/decision\_agent.py} implementa l'agente
-decisionale, caratterizzato secondo il modello PEAS in
-Tabella~\ref{tab:peas}.
-
-\begin{table}[h]
-\centering
-\small
-\begin{tabular}{@{}p{1.6cm}p{11.2cm}@{}}
-\toprule
-\textbf{PEAS} & \textbf{Definizione nel sistema} \\
-\midrule
-Performance & Diagnosi corrette, tempo di reazione, risparmio idrico, riduzione dei falsi allarmi. \\
-Environment & Serra simulata: parzialmente osservabile (i sensori non colgono l'intero stato della pianta), dinamica, continua per i valori ambientali, discreta per le classi patologiche. \\
-Actuators & Pompa di irrigazione, ventola di areazione, LED/allarme, notifica testuale. \\
-Sensors & Fotocamera virtuale, sensori ambientali virtuali. \\
-\bottomrule
-\end{tabular}
-\caption{Caratterizzazione PEAS dell'agente decisionale di PomodorIA.}
-\label{tab:peas}
-\end{table}
-
-L'agente è di tipo \textbf{reattivo basato su modello e su obiettivi}:
+Il modulo \texttt{agent/decision\_agent.py} implementa l'agente decisionale
+introdotto nella Sezione~\ref{sec:peas}: la sua performance è misurata in
+diagnosi corrette, tempo di reazione, risparmio idrico e riduzione dei
+falsi allarmi, e opera in un ambiente parzialmente osservabile e dinamico
+(la serra simulata). È di tipo \textbf{reattivo basato su modello e su
+obiettivi}:
 mantiene uno stato interno (il contatore di rilevamenti di malattia
 consecutivi, per distinguere un rilevamento isolato da un'epidemia in
 corso) e sceglie le proprie azioni tramite le regole a priorità decrescente
@@ -142,17 +126,19 @@ parte (nessun pin fisico), e un registro centrale li aggrega per l'agente.
 
 \begin{figure}[h]
 \centering
+\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
-    box/.style={draw, rounded corners, minimum width=3.4cm, minimum height=0.9cm,
+    box/.style={draw, rounded corners, minimum width=3.2cm, minimum height=0.9cm,
         align=center, font=\small},
-    node distance=1cm and 1cm,
+    node distance=1.3cm and 1.4cm,
 ]
-\node[box, fill=pomodoroTeal!10, draw=pomodoroTeal] (base) {SimulatedActuator};
-\node[box, below left=1.3cm and -0.6cm of base] (irr) {IrrigationActuator};
-\node[box, below=1.3cm of base] (vent) {VentilationActuator};
-\node[box, below right=1.3cm and -0.6cm of base] (alarm) {AlarmActuator};
-\node[box, right=2.2cm of base, fill=pomodoroAmber!10, draw=pomodoroAmber] (notif) {NotificationActuator};
-\node[box, above=1.1cm of base, fill=pomodoroPurple!8, draw=pomodoroPurple] (bank) {ActuatorBank};
+\node[box, fill=pomodoroPurple!8, draw=pomodoroPurple] (bank) {ActuatorBank};
+\node[box, below=of bank, fill=pomodoroTeal!10, draw=pomodoroTeal] (base) {SimulatedActuator};
+\node[box, right=2.6cm of bank, fill=pomodoroAmber!10, draw=pomodoroAmber] (notif) {NotificationActuator};
+
+\node[box, below=of base] (vent) {VentilationActuator};
+\node[box, left=of vent] (irr) {IrrigationActuator};
+\node[box, right=of vent] (alarm) {AlarmActuator};
 
 \draw[-{Triangle[open,length=3mm]}, thick] (irr) -- (base);
 \draw[-{Triangle[open,length=3mm]}, thick] (vent) -- (base);
@@ -160,6 +146,7 @@ parte (nessun pin fisico), e un registro centrale li aggrega per l'agente.
 \draw[-{Diamond}, thick] (bank) -- (base);
 \draw[-{Diamond}, thick] (bank) -- (notif);
 \end{tikzpicture}
+}
 \caption{Relazioni fra le classi del livello di attuazione: freccia vuota = ereditarietà, rombo = aggregazione.}
 \label{fig:diagramma-classi}
 \end{figure}
