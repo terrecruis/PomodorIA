@@ -3,39 +3,31 @@
 
 \subsection{Motivazione e contesto}
 
-L'agricoltura di precisione rappresenta oggi uno degli ambiti applicativi più
-concreti dell'Internet of Things: sensori ambientali, sistemi di visione
-artificiale e attuatori connessi permettono di monitorare le colture in tempo
-reale, ridurre gli sprechi di acqua e agrofarmaci, e intervenire tempestivamente
-alla comparsa di patologie. Come evidenziato anche nel percorso didattico del
-corso (evoluzione da \emph{Agriculture 1.0}, basata su risorse umane e animali,
-fino alla \emph{Agriculture 4.0}, caratterizzata dall'uso di intelligenza
-artificiale e sistemi informativi per analizzare, elaborare e decidere), la
-tendenza è quella di spostare sempre più capacità decisionale vicino alla fonte
-del dato, riducendo la dipendenza dal cloud e i tempi di reazione.
+L'agricoltura di precisione è oggi uno degli ambiti applicativi più concreti
+dell'Internet of Things: sensori ambientali, sistemi di visione artificiale
+e attuatori connessi permettono di monitorare le colture in tempo reale,
+ridurre gli sprechi di acqua e agrofarmaci, e intervenire tempestivamente
+alla comparsa di patologie~[\ref{bib:corso}]. La tendenza generale è quella
+di spostare sempre più capacità decisionale vicino alla fonte del dato
+(\emph{Edge Computing}), riducendo la dipendenza dal cloud e i tempi di
+reazione.
 
 \textbf{PomodorIA} nasce in questo contesto come progetto per l'esame di
-\emph{Internet of Things}, con l'obiettivo di realizzare un caso di studio
-completo e coerente di \textbf{Edge AI applicata alla Smart Agriculture}:
-una serra domotica in grado di osservare le foglie di pianta di pomodoro,
-diagnosticare automaticamente eventuali patologie tramite una rete neurale
-convoluzionale (CNN), incrociare la diagnosi con parametri ambientali e
-decidere in autonomia se attivare irrigazione, ventilazione o allarmi.
+\emph{Internet of Things}: un caso di studio di \textbf{Edge AI applicata
+alla Smart Agriculture}, che simula una serra domotica in grado di
+osservare le foglie di pianta di pomodoro, diagnosticare automaticamente
+eventuali patologie tramite una rete neurale convoluzionale (CNN),
+incrociare la diagnosi con parametri ambientali e decidere in autonomia se
+attivare irrigazione, ventilazione o allarmi.
 
-Il progetto riutilizza e porta a compimento pratico un lavoro precedente,
-svolto nell'ambito del corso di \emph{Neural Networks}, in cui è stata
-addestrata e validata una CNN capace di riconoscere 10 classi di stato
-fogliare (9 patologie più la classe "sana") sul dataset pubblico
-\emph{PlantVillage -- Tomato}. PomodorIA prende quel modello già allenato e
-lo sottopone all'intero ciclo di vita richiesto da un vero deployment
-\emph{Edge}: compressione (pruning e quantizzazione), integrazione in un
-sistema sensori-attuatori, orchestrazione in un ciclo continuo, e
-presentazione dei risultati tramite una dashboard di monitoraggio.
+Il progetto riutilizza un modello già allenato in un lavoro precedente
+(esame di \emph{Neural Networks}~[\ref{bib:cnntomato}]), e lo sottopone
+all'intero ciclo di vita di un deployment \emph{Edge}: compressione,
+integrazione in un sistema sensori-attuatori, orchestrazione in un ciclo
+continuo, e presentazione dei risultati tramite una dashboard di
+monitoraggio.
 
 \subsection{Obiettivi del progetto}
-
-Gli obiettivi che il progetto si pone, e che questa documentazione intende
-argomentare in dettaglio, sono i seguenti:
 
 \begin{enumerate}
     \item Dimostrare, con un \emph{Proof of Concept} interamente software, il
@@ -46,15 +38,16 @@ argomentare in dettaglio, sono i seguenti:
     applicando e confrontando tecniche di compressione dei modelli
     (\emph{pruning} strutturato e \emph{quantizzazione}).
     \item Progettare un agente decisionale razionale, formalizzato secondo il
-    modello \textbf{PEAS} (Performance, Environment, Actuators, Sensors)
-    visto a lezione, capace di combinare l'informazione visiva (diagnosi
-    della CNN) con l'informazione ambientale (temperatura, umidità, luce)
-    secondo il paradigma della \textbf{Data Fusion}.
-    \item Mappare esplicitamente l'architettura del sistema sul modello a
-    sette livelli \textbf{IoT World Forum (IoTWF)}, per collegare le scelte
-    implementative alla teoria del corso.
+    modello \textbf{PEAS} (Performance, Environment, Actuators, Sensors),
+    capace di combinare l'informazione visiva (diagnosi della CNN) con
+    l'informazione ambientale (temperatura, umidità, luce) secondo il
+    paradigma della \textbf{Data Fusion}.
+    \item Organizzare l'architettura del sistema secondo il modello a sette
+    livelli \textbf{IoT World Forum (IoTWF)}, così che ogni componente
+    software abbia un ruolo chiaramente definito all'interno della pipeline
+    IoT complessiva.
     \item Fornire un'interfaccia di monitoraggio (dashboard) che renda
-    visibili e misurabili, in tempo reale, tutte le grandezze rilevanti del
+    visibili e misurabili, in tempo reale, le grandezze rilevanti del
     sistema: accuratezza delle diagnosi, latenza di inferenza, consumo di
     risorse, stato degli attuatori.
 \end{enumerate}
@@ -62,38 +55,18 @@ argomentare in dettaglio, sono i seguenti:
 \subsection{Perché una simulazione software}
 
 Il progetto è dichiaratamente un \emph{Proof of Concept} privo di hardware
-fisico: non vengono utilizzati un Raspberry Pi reale, una fotocamera reale, né
-sensori ambientali reali. Questa scelta è stata presa consapevolmente per due
-motivi. In primo luogo, l'obiettivo didattico del progetto è dimostrare la
-comprensione dell'architettura e delle problematiche di un sistema Edge AI
-IoT (gestione delle risorse limitate, compressione dei modelli, integrazione
-sensori-attuatori-agente), aspetti che restano identici a prescindere dalla
-presenza di hardware fisico. In secondo luogo, la simulazione consente di
-riprodurre in modo controllato e ripetibile scenari altrimenti difficili da
-ottenere con hardware reale (ad esempio un'epidemia di una specifica
-patologia, o condizioni ambientali estreme), rendendo il sistema più adatto
-alla verifica sperimentale e alla dimostrazione in sede di esame.
+fisico: non vengono utilizzati un Raspberry Pi reale, una fotocamera reale,
+né sensori ambientali reali. La scelta permette di riprodurre in modo
+controllato e ripetibile scenari altrimenti difficili da ottenere con
+hardware reale (un'epidemia di una specifica patologia, condizioni
+ambientali estreme), restando comunque focalizzata sugli stessi problemi
+tecnici di un vero sistema Edge AI: gestione delle risorse limitate,
+compressione dei modelli, integrazione sensori-attuatori-agente.
 
-Il codice è comunque scritto secondo il principio del \emph{drop-in
-replacement}: i moduli che simulano hardware (fotocamera, sensori, GPIO)
+Il codice è scritto secondo il principio del \emph{drop-in replacement}: i
+moduli che simulano hardware (fotocamera, sensori, GPIO\footnote{\emph{General
+Purpose Input/Output}: i piedini fisici di una scheda come il Raspberry Pi,
+usati per pilotare dispositivi elettrici reali (pompe, ventole, LED).})
 espongono la stessa interfaccia che avrebbero le rispettive controparti
-reali, per cui il passaggio a un deployment fisico su Raspberry Pi
-richiederebbe la sostituzione dei soli moduli di I/O, senza toccare la
-logica applicativa (motore di inferenza, agente decisionale, orchestratore).
-
-\subsection{Struttura del documento}
-
-Il documento è organizzato come segue. La Sezione~\ref{sec:contesto} richiama
-i concetti teorici del corso di Internet of Things utilizzati nel progetto
-(IoTWF, agenti razionali, Data Fusion, Smart Agriculture). La
-Sezione~\ref{sec:architettura} descrive l'architettura complessiva del
-sistema e il suo mapping sui sette livelli IoTWF. La
-Sezione~\ref{sec:modello-ml} descrisce il modello di Machine Learning alla
-base del sistema. La Sezione~\ref{sec:moduli} entra nel dettaglio di ciascun
-modulo software. La Sezione~\ref{sec:compressione} discute la pipeline di
-compressione del modello per l'Edge, incluse le problematiche tecniche
-incontrate e risolte durante lo sviluppo. La
-Sezione~\ref{sec:risultati} presenta i risultati sperimentali. La
-Sezione~\ref{sec:esecuzione} fornisce una guida pratica all'esecuzione del
-progetto. Le Sezioni~\ref{sec:limiti} e~\ref{sec:conclusioni} discutono
-rispettivamente i limiti noti, gli sviluppi futuri e le conclusioni.
+reali, per cui il passaggio a un deployment fisico richiederebbe la sola
+sostituzione dei moduli di I/O, senza toccare la logica applicativa.

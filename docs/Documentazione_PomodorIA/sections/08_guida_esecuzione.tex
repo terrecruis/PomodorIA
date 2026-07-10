@@ -1,30 +1,32 @@
 \section{Guida all'esecuzione}
 \label{sec:esecuzione}
 
-Questa sezione fornisce le istruzioni operative complete per configurare ed
-eseguire il progetto da zero su una nuova macchina.
+Questa sezione fornisce le istruzioni operative per eseguire il progetto.
+L'archivio consegnato include già tutto il necessario per l'esecuzione
+immediata: il checkpoint della rete allenata
+(\texttt{models/CNN\_64f-k3-3blk.pth}) e il sottoinsieme di test già
+estratto (\texttt{plantvillage\_testset/}, Sezione~\ref{sec:moduli}) --
+senza questi due elementi non sarebbe possibile eseguire un'inferenza
+sensata: il primo perché il training della rete richiede ore su GPU e non è
+lo scopo di questo progetto, il secondo perché senza di esso la fotocamera
+virtuale pescherebbe anche immagini già viste in addestramento, mostrando
+un'accuratezza artificiosamente vicina al 100\%.
 
 \subsection{Prerequisiti}
 
 \begin{itemize}
     \item Python 3.10 o superiore.
-    \item Una copia locale del dataset \emph{PlantVillage -- Tomato}
-    (ottenibile, ad esempio, tramite la libreria \texttt{kagglehub}, come
-    nel progetto di training originale).
-    \item Il checkpoint della rete già allenata (\texttt{CNN\_64f-k3-3blk.pth}),
-    non incluso nel repository per motivi di dimensione e da copiare
-    manualmente nella cartella \texttt{models/}.
+    \item I file già inclusi nell'archivio: checkpoint della rete e
+    cartella \texttt{plantvillage\_testset/} (si veda sopra).
 \end{itemize}
 
 \subsection{Passo 1 -- Ambiente virtuale e dipendenze}
 
 \begin{lstlisting}[language=bash]
-cd PomodorIA
-
 # Crea un ambiente virtuale isolato
 python3 -m venv venv
 
-# Attiva l'ambiente (da ripetere ad ogni nuova sessione di terminale)
+# Attiva l'ambiente
 source venv/bin/activate          # macOS / Linux
 # venv\Scripts\activate           # Windows
 
@@ -33,32 +35,10 @@ pip install --upgrade pip
 pip install -r requirements.txt
 \end{lstlisting}
 
-\subsection{Passo 2 -- Estrazione del test set corretto}
-
-Come discusso nella Sezione~\ref{sec:compressione}, per ottenere misure di
-accuratezza rappresentative è necessario isolare il sottoinsieme di test
-(20\%) mai osservato durante il training, riproducendo lo split originale
-(\texttt{seed=42}):
-
-\begin{lstlisting}[language=bash]
-python scripts/extract_test_set.py \
-    --dataset-root "/percorso/al/dataset/plantvillage" \
-    --output-dir "./plantvillage_testset" \
-    --mode symlink
-\end{lstlisting}
-
-Il parametro \texttt{--dataset-root} deve puntare alla stessa copia del
-dataset (stessi file, stesso ordine alfabetico) utilizzata durante il
-training originale, condizione necessaria affinché la riproduzione dello
-split casuale produca esattamente lo stesso sottoinsieme di test.
-L'opzione \texttt{--mode symlink} (predefinita) crea collegamenti simbolici
-anziché copie fisiche dei file, evitando di duplicare inutilmente spazio su
-disco.
-
-\subsection{Passo 3 -- Configurazione}
+\subsection{Passo 2 -- Configurazione}
 
 Verificare che il file \texttt{config.yaml} punti alla cartella del test
-set appena estratta:
+set già inclusa nell'archivio:
 
 \begin{lstlisting}[language={}]
 paths:
@@ -67,34 +47,42 @@ paths:
 \end{lstlisting}
 
 \begin{warnbox}
-Se si utilizza la dashboard Streamlit, ricordare che il file
-\texttt{config.yaml} viene letto una sola volta all'avvio del processo e
-tenuto in cache per tutta la sua durata. Ogni modifica al file richiede
-l'arresto (\texttt{CTRL+C}) e il riavvio del comando
-\texttt{streamlit run}: un semplice aggiornamento della pagina nel browser
-\emph{non} è sufficiente.
+Se si utilizza la dashboard Streamlit, il file \texttt{config.yaml} viene
+letto una sola volta all'avvio del processo e tenuto in cache per tutta la
+sua durata: ogni modifica al file richiede l'arresto (\texttt{CTRL+C}) e il
+riavvio del comando \texttt{streamlit run} -- un semplice aggiornamento
+della pagina nel browser \emph{non} è sufficiente.
 \end{warnbox}
 
-\subsection{Passo 4 -- Generazione dei modelli compressi (opzionale)}
+\emph{Nota per la riproducibilità}: la cartella \texttt{plantvillage\_testset/}
+è stata generata con lo script \texttt{scripts/extract\_test\_set.py}, che
+riproduce lo split casuale (\texttt{seed=42}, 80/20) del progetto di
+training originale a partire dal dataset completo. Rieseguirlo non è
+necessario per usare il progetto così come consegnato; serve solo se si
+vuole rigenerare il sottoinsieme di test da una copia locale del dataset
+completo.
 
-Necessario solo se si intende utilizzare la modalità \texttt{optimized} o
-visualizzare i grafici di confronto nella dashboard:
+\subsection{Passo 3 -- Generazione dei modelli compressi (opzionale)}
+
+Necessario solo per usare la modalità \texttt{optimized} o i grafici di
+confronto nella dashboard:
 
 \begin{lstlisting}[language=bash]
 python models/compress.py
-# oppure, per una sparsità di pruning diversa dal 30% predefinito:
-python models/compress.py --sparsity 0.5
 \end{lstlisting}
 
-Al termine, la cartella \texttt{models/optimized/} conterrà le tre varianti
-compresse descritte nella Sezione~\ref{sec:compressione}, e il file
-\texttt{benchmarks/benchmark\_results.csv} verrà aggiornato con le relative
-metriche.
+Al termine, \texttt{models/optimized/} conterrà le tre varianti compresse
+(Sezione~\ref{sec:compressione}) e \texttt{benchmarks/benchmark\_results.csv}
+verrà aggiornato con le relative metriche.
 
-\subsection{Passo 5 -- Avvio del sistema}
+\subsection{Passo 4 -- Avvio del sistema}
 
-Sono disponibili due modalità di esecuzione equivalenti, descritte in
-Sezione~\ref{sec:architettura}.
+Le due modalità (Sezione~\ref{sec:moduli}) rispondono a esigenze diverse: in
+un deployment reale, il Raspberry Pi nella serra girerebbe senza schermo,
+scrivendo solo un log -- lo scenario riprodotto dall'esecuzione da riga di
+comando; la dashboard, invece, rappresenta uno strumento di supervisione
+che un operatore userebbe per ispezionare il sistema da remoto o durante
+una demo, non qualcosa che girerebbe stabilmente sul dispositivo stesso.
 
 \subsubsection{Dashboard interattiva (consigliata per la dimostrazione)}
 
@@ -102,18 +90,10 @@ Sezione~\ref{sec:architettura}.
 streamlit run dashboard/app_streamlit.py
 \end{lstlisting}
 
-Il comando apre automaticamente il browser all'indirizzo
-\url{http://localhost:8501}. Dalla barra laterale è possibile:
-
-\begin{itemize}
-    \item scegliere la modalità del modello (\emph{Full Precision} o
-    \emph{Ottimizzato}) e, in quest'ultimo caso, la variante compressa
-    specifica da utilizzare (Sezione~\ref{sec:compressione});
-    \item forzare la fotocamera virtuale a campionare da una classe
-    patologica specifica, per dimostrazioni mirate;
-    \item impostare l'intervallo fra i cicli e il numero massimo di cicli;
-    \item avviare, fermare e resettare la simulazione.
-\end{itemize}
+Apre automaticamente il browser su \url{http://localhost:8501}. Dalla barra
+laterale si scelgono modalità/variante del modello, un'eventuale classe
+forzata per demo mirate, l'intervallo fra i cicli, e si avvia/ferma/resetta
+la simulazione.
 
 \subsubsection{Esecuzione da riga di comando}
 
@@ -131,27 +111,6 @@ python orchestrator/main_loop.py --mode optimized --variant onnx --cycles 100
 python orchestrator/main_loop.py --cycles 0 --quiet
 \end{lstlisting}
 
-Al termine dell'esecuzione, il file di log generato in \texttt{logs/} può
-essere analizzato con strumenti standard per l'analisi tabellare (ad esempio
-la libreria \texttt{pandas}, oppure aperto direttamente con un foglio di
-calcolo).
-
-\subsection{Riepilogo dei comandi essenziali}
-
-\begin{table}[h]
-\centering
-\small
-\begin{tabular}{@{}p{6.4cm}p{6.4cm}@{}}
-\toprule
-\textbf{Operazione} & \textbf{Comando} \\
-\midrule
-Attivare l'ambiente virtuale & \texttt{source venv/bin/activate} \\
-Estrarre il test set corretto & \texttt{python scripts/extract\_test\_set.py ...} \\
-Generare i modelli compressi & \texttt{python models/compress.py} \\
-Avviare la dashboard & \texttt{streamlit run dashboard/app\_streamlit.py} \\
-Avviare da terminale & \texttt{python orchestrator/main\_loop.py} \\
-\bottomrule
-\end{tabular}
-\caption{Riepilogo dei comandi principali per l'esecuzione del progetto.}
-\label{tab:comandi-riepilogo}
-\end{table}
+Il file di log generato in \texttt{logs/} può essere analizzato con
+strumenti standard per l'analisi tabellare (es. \texttt{pandas}, o un
+foglio di calcolo).

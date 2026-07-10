@@ -1,25 +1,27 @@
 \section{Contesto e riferimenti teorici}
 \label{sec:contesto}
 
-Questa sezione richiama, in forma sintetica, i concetti del corso di Internet
-of Things che hanno guidato le scelte progettuali di PomodorIA, evidenziando
-esplicitamente il collegamento fra teoria e implementazione.
+Questa sezione richiama, in forma sintetica, i concetti teorici che hanno
+guidato le scelte progettuali di PomodorIA.
 
 \subsection{Il modello IoT World Forum (IoTWF)}
 \label{sec:iotwf}
 
-Il modello di riferimento adottato per strutturare l'architettura del sistema
-è il modello a sette livelli \textbf{IoT World Forum}, che descrive un
-sistema IoT come una pipeline che va dal dispositivo fisico fino ai processi
-di collaborazione con l'utente finale:
+L'architettura del sistema è organizzata secondo il modello a sette livelli
+\textbf{IoT World Forum}~[\ref{bib:corso}], che descrive un sistema IoT come
+una pipeline che va dal dispositivo fisico fino ai processi di
+collaborazione con l'utente finale:
 
 \begin{enumerate}
     \item \textbf{Physical Devices \& Controllers} --- i dispositivi fisici
     (sensori, attuatori) che percepiscono e agiscono sul mondo reale.
     \item \textbf{Connectivity} --- l'infrastruttura di comunicazione tra i
     dispositivi e il resto del sistema.
-    \item \textbf{Edge (Fog) Computing} --- l'elaborazione dei dati vicino
-    alla fonte, per ridurre latenza e dipendenza dal cloud.
+    \item \textbf{Edge (Fog) Computing}\footnote{\emph{Fog Computing}: un'estensione
+    del paradigma Edge Computing, in cui l'elaborazione dei dati avviene su
+    nodi intermedi distribuiti fra il dispositivo e il cloud, non
+    necessariamente sul dispositivo stesso~[\ref{bib:fog}].} --- l'elaborazione
+    dei dati vicino alla fonte, per ridurre latenza e dipendenza dal cloud.
     \item \textbf{Data Accumulation} --- la persistenza dei dati raccolti.
     \item \textbf{Data Abstraction} --- la normalizzazione e strutturazione
     dei dati per renderli utilizzabili dal livello applicativo.
@@ -29,47 +31,24 @@ di collaborazione con l'utente finale:
     processi umani e organizzativi (notifiche, decisioni condivise).
 \end{enumerate}
 
-Questo modello è utilizzato in maniera sistematica nella
-Sezione~\ref{sec:architettura} per motivare esplicitamente ogni scelta
-implementativa del progetto.
+\subsection{Smart Agriculture}
 
-\subsection{Smart Agriculture e Agriculture 4.0}
-
-Il corso inquadra la Smart Agriculture come uno degli ambiti applicativi
-principali dell'IoT, in stretta relazione con il concetto di
-\emph{Climate-Smart Agriculture}: l'uso di sensori (stazioni meteo, sensori
-di umidità del suolo, videocamere, droni) per raccogliere dati su ogni
-singola area o coltura, permettendo agli agricoltori di decidere in anticipo
-e con precisione come distribuire acqua, pesticidi o fertilizzanti. Questa
-evoluzione viene descritta come un percorso a quattro fasi:
-
-\begin{itemize}
-    \item \textbf{Agriculture 1.0} (1784--1870 circa): agricoltura basata su
-    risorse umane e animali, scarsa efficienza.
-    \item \textbf{Agriculture 2.0} (XX secolo): agricoltura meccanizzata, uso
-    ancora inefficiente delle risorse.
-    \item \textbf{Agriculture 3.0} (1992--2017): agricoltura automatizzata ad
-    alta velocità, ma con scarsa intelligenza nel processo decisionale.
-    \item \textbf{Agriculture 4.0} (dal 2017 ad oggi): Smart Agriculture,
-    basata sull'uso di intelligenza artificiale e sistemi informativi
-    moderni per analizzare, elaborare e decidere.
-\end{itemize}
-
-PomodorIA si colloca esplicitamente in quest'ultima fase: l'elemento
-distintivo del progetto non è la sola raccolta di dati ambientali (già
-presente nelle fasi precedenti), ma l'uso di un modello di intelligenza
-artificiale (la CNN) per l'analisi diretta dello stato di salute della
-pianta a partire da un dato visivo, integrato con un agente decisionale
-automatico.
+La Smart Agriculture è uno degli ambiti applicativi principali dell'IoT: uso
+di sensori (stazioni meteo, sensori di umidità del suolo, videocamere,
+droni) per raccogliere dati su singole aree o colture, e supportare decisioni
+di irrigazione, fertilizzazione e trattamento fitosanitario~[\ref{bib:corso}].
+PomodorIA si colloca in questo ambito applicativo: l'elemento distintivo del
+progetto è l'uso di un modello di intelligenza artificiale (la CNN) per
+l'analisi diretta dello stato di salute della pianta a partire da un dato
+visivo, integrato con un agente decisionale automatico.
 
 \subsection{Agenti razionali e modello PEAS}
 \label{sec:peas}
 
-Il corso introduce il concetto di \emph{agente razionale} come entità che
-percepisce l'ambiente tramite sensori e agisce su di esso tramite attuatori,
-scegliendo l'azione che massimizza una misura di prestazione attesa. La
-caratterizzazione formale di un agente avviene tramite il modello
-\textbf{PEAS}:
+Un \emph{agente razionale}~[\ref{bib:rn}] è un'entità che percepisce
+l'ambiente tramite sensori e agisce su di esso tramite attuatori, scegliendo
+l'azione che massimizza una misura di prestazione attesa. La sua
+caratterizzazione formale avviene tramite il modello \textbf{PEAS}:
 
 \begin{itemize}
     \item \textbf{P -- Performance}: il criterio con cui si misura il
@@ -83,34 +62,30 @@ caratterizzazione formale di un agente avviene tramite il modello
     l'ambiente.
 \end{itemize}
 
-Il PEAS applicato all'agente decisionale di PomodorIA è discusso nel
-dettaglio nella Sezione~\ref{sec:agent-layer}, dove l'agente viene inoltre
-classificato secondo le tipologie standard degli agenti (reattivo,
-basato su modello, basato su obiettivi).
+L'agente decisionale di PomodorIA, caratterizzato secondo questo schema, è
+descritto nella Sezione~\ref{sec:agent-layer}.
 
 \subsection{Data Fusion}
 
-Un ulteriore concetto cardine del progetto è la \textbf{Data Fusion}: la
-combinazione di dati provenienti da fonti eterogenee (nel nostro caso,
-un'immagine e una serie di letture ambientali numeriche) in un'unica
-rappresentazione coerente, per prendere decisioni più robuste di quelle
-ottenibili da una singola fonte isolata. Nel progetto, questo principio è
-implementato correlando statisticamente i valori ambientali simulati alla
-patologia rilevata nell'immagine, cosicché l'agente decisionale possa
-ragionare su un quadro informativo coerente (ad esempio, una diagnosi di
-malattia fungina accompagnata da un valore di umidità plausibilmente
-elevato), esattamente come avverrebbe incrociando dati reali da sensori
-fisici differenti.
+La \textbf{Data Fusion}~[\ref{bib:datafusion}] è la combinazione di dati
+provenienti da fonti eterogenee -- nel caso di PomodorIA, un'immagine e una
+serie di letture ambientali numeriche -- in un'unica rappresentazione
+coerente, per prendere decisioni più robuste di quelle ottenibili da una
+singola fonte isolata. Nel progetto questo principio è implementato
+correlando statisticamente i valori ambientali simulati alla patologia
+rilevata nell'immagine (Sezione~\ref{sec:moduli}), cosicché l'agente
+decisionale possa ragionare su un quadro informativo coerente, ad esempio
+una diagnosi di malattia fungina accompagnata da un valore di umidità
+plausibilmente elevato.
 
 \subsection{Edge e Fog Computing}
 
-Il corso motiva lo spostamento della computazione verso i margini della
-rete (Edge/Fog Computing) con la necessità di ridurre la latenza di
-risposta e la dipendenza da connettività verso il cloud, un vincolo
-particolarmente rilevante in scenari come le serre agricole, spesso
-collocate in aree con connettività limitata. PomodorIA riflette questa
-motivazione teorica nella scelta di eseguire l'intera inferenza della CNN
-localmente (su CPU, con vincoli di risorse simulati), applicando tecniche
-di compressione del modello (Sezione~\ref{sec:compressione}) proprio per
-renderlo eseguibile su un dispositivo Edge a risorse limitate come un
-Raspberry Pi.
+Lo spostamento della computazione verso i margini della rete
+(\emph{Edge/Fog Computing}~[\ref{bib:fog}]) riduce la latenza di risposta e
+la dipendenza da connettività verso il cloud, un vincolo particolarmente
+rilevante in scenari come le serre agricole, spesso collocate in aree con
+connettività limitata. PomodorIA riflette questa motivazione nella scelta
+di eseguire l'intera inferenza della CNN localmente (su CPU, con vincoli di
+risorse simulati), applicando le tecniche di compressione descritte nella
+Sezione~\ref{sec:compressione} per renderla eseguibile su un dispositivo
+Edge a risorse limitate come un Raspberry Pi.

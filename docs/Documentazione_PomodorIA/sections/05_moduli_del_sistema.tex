@@ -1,105 +1,70 @@
 \section{Moduli del sistema}
 \label{sec:moduli}
 
-Questa sezione descrive in dettaglio ciascun modulo software del progetto,
-organizzato secondo i livelli logici già introdotti nella
-Sezione~\ref{sec:architettura}: Sensor Layer, Edge AI Layer, Agent Layer,
-Actuator Layer, e i due orchestratori (CLI e dashboard).
+Questa sezione descrive ciascun modulo software del progetto, organizzato
+secondo i livelli logici dell'architettura: Sensor Layer, Edge AI Layer,
+Agent Layer, Actuator Layer, e i due programmi che li orchestrano.
 
 \subsection{Sensor Layer}
 
 \subsubsection{Fotocamera virtuale (\texttt{sensors/virtual\_camera.py})}
 
 La classe \texttt{VirtualCameraSensor} simula una fotocamera installata
-nella serra, sostituendo un dispositivo fisico (collegabile via CSI o USB a
-un Raspberry Pi reale) con un campionamento pseudo-casuale di immagini reali
-dal dataset PlantVillage-Tomato. All'inizializzazione, il modulo scansiona
-la cartella del dataset e costruisce un indice di tutte le immagini
-disponibili, organizzato per classe. Ad ogni chiamata del metodo
-\texttt{capture()}, viene selezionata un'immagine (in modo uniforme fra
-tutte le classi, oppure con un \emph{bias} verso una classe specifica se
-configurato tramite il parametro \texttt{bias\_class}, utile per simulare
-scenari mirati come un'epidemia di una particolare patologia durante una
-dimostrazione), viene applicato il preprocessing descritto nella
-Sezione~\ref{sec:modello-ml}, e viene restituita una struttura dati
-(\texttt{CameraCapture}) contenente il tensore pronto per l'inferenza, il
-percorso del file, l'etichetta reale (nota perché proveniente da un dataset
-etichettato, usata esclusivamente per il calcolo dell'accuratezza nel PoC e
-mai fornita in input alla rete) e un timestamp.
+nella serra, sostituendo un dispositivo fisico con un campionamento
+pseudo-casuale di immagini reali dal dataset PlantVillage-Tomato.
+All'inizializzazione scansiona la cartella del dataset e indicizza tutte le
+immagini disponibili per classe. Ad ogni chiamata di \texttt{capture()}
+seleziona un'immagine (uniformemente, oppure con un \emph{bias} verso una
+classe specifica se configurato, utile per simulare un'epidemia mirata in
+demo), applica il preprocessing (Sezione~\ref{sec:modello-ml}) e restituisce
+il tensore pronto per l'inferenza insieme all'etichetta reale -- nota perché
+proveniente da un dataset etichettato, usata solo per calcolare
+l'accuratezza nel PoC, mai fornita in input alla rete.
 
 \begin{notebox}
 Per evitare che la CNN venga valutata su immagini già viste durante il
 training (situazione che produrrebbe un'accuratezza artificiosamente vicina
-al 100\%, non rappresentativa delle reali capacità del modello), la cartella
-dataset utilizzata da PomodorIA contiene esclusivamente il sottoinsieme di
-\emph{test} (20\% del dataset originale), ottenuto riproducendo esattamente
-lo stesso split casuale (\texttt{random\_split} con seed fisso pari a 42)
-utilizzato nel progetto di training originale. Questo garantisce che ogni
-misura di accuratezza riportata in questo documento rifletta la reale
-capacità di generalizzazione del modello su dati mai osservati in fase di
-addestramento.
+al 100\%), la cartella dataset usata da PomodorIA contiene esclusivamente il
+sottoinsieme di test (20\% del dataset originale, 2.906 immagini),
+riproducendo esattamente lo split casuale del progetto di training
+originale~[\ref{bib:cnntomato}]. Le misure di accuratezza riportate in
+questo documento (Sezione~\ref{sec:risultati}) riflettono quindi la reale
+capacità di generalizzazione del modello.
 \end{notebox}
 
 \subsubsection{Simulatore di sensori ambientali (\texttt{sensors/environment\_simulator.py})}
 
 La classe \texttt{EnvironmentSensorSimulator} genera valori sintetici di
-temperatura, umidità relativa, umidità del suolo e luminosità, in analogia
-con sensori fisici reali (rispettivamente assimilabili a un DHT22, un
-igrometro capacitivo e un sensore di luminosità BH1750). La particolarità
-del modulo, e l'implementazione concreta del principio di \textbf{Data
-Fusion} discusso nella Sezione~\ref{sec:contesto}, risiede nel metodo
-\texttt{read(disease\_label)}: se viene fornita l'etichetta reale della
-patologia rilevata nell'immagine appena acquisita, i valori ambientali
-vengono generati secondo un profilo statistico specifico per quella
-patologia (una distribuzione gaussiana con media e deviazione standard
-calibrate su conoscenza botanica reale, ad esempio umidità elevata e
-temperatura moderata per le patologie fungine come il Late Blight), anziché
-in modo puramente casuale. Questo rende lo scenario simulato coerente e
-"raccontabile": la diagnosi visiva e il contesto ambientale, per quanto
-entrambi simulati, risultano tra loro plausibili, esattamente come
-avverrebbe incrociando un dato reale da fotocamera con un dato reale da
-sensore ambientale in un deployment fisico.
+temperatura, umidità dell'aria, umidità del suolo e luminosità. Se riceve
+l'etichetta della patologia rilevata nell'immagine appena acquisita, genera
+i valori secondo un profilo statistico specifico per quella patologia
+(distribuzione gaussiana con media e deviazione standard calibrate su
+condizioni ambientali realistiche per le principali patologie fungine,
+ad es. umidità elevata e temperatura moderata per Early ed Late
+Blight~[\ref{bib:earlyblight}, \ref{bib:lateblight}]), anziché in modo
+puramente casuale -- l'implementazione concreta del principio di Data
+Fusion (Sezione~\ref{sec:contesto}): la diagnosi visiva e il contesto
+ambientale, per quanto entrambi simulati, risultano tra loro plausibili.
 
 \subsection{Edge AI Layer}
 \label{sec:edge-layer}
 
-Il modulo \texttt{edge/inference\_engine.py} implementa la classe
-\texttt{InferenceEngine}, responsabile di:
-
-\begin{enumerate}
-    \item \textbf{caricamento del modello}: in base alla configurazione
-    (\texttt{full\_precision} oppure \texttt{optimized}), carica il
-    checkpoint appropriato, ricostruendo l'architettura \texttt{TomatoCNN}
-    e caricando i pesi salvati, oppure delegando l'esecuzione a un motore
-    ONNX Runtime (Sezione~\ref{sec:compressione});
-    \item \textbf{esecuzione dell'inferenza}: applica il modello al tensore
-    fornito dalla fotocamera virtuale, misurando il tempo di esecuzione con
-    precisione al millisecondo;
-    \item \textbf{post-processing}: applica la funzione softmax ai logits
-    grezzi restituiti dal modello, individua la classe con probabilità
-    massima e restituisce una struttura dati (\texttt{InferenceResult})
-    contenente etichetta predetta, confidenza, vettore di probabilità
-    completo, tempo di inferenza e RAM utilizzata dal processo in quel
-    momento;
-    \item \textbf{simulazione dei vincoli di un dispositivo Edge}: il
-    numero di thread CPU utilizzabili da PyTorch viene limitato a 1
-    (\texttt{torch.set\_num\_threads(1)}) e l'esecuzione è forzata su CPU,
-    per rendere le misure di latenza rappresentative di un dispositivo
-    embedded privo di GPU dedicata, come un Raspberry Pi.
-\end{enumerate}
-
-Il motore di inferenza supporta inoltre la selezione esplicita, tramite il
-parametro di configurazione \texttt{optimized\_variant}, di quale variante
-compressa del modello utilizzare (dettagli in
-Sezione~\ref{sec:compressione}), rendendo possibile confrontare
-sperimentalmente le diverse tecniche di compressione applicate.
+La classe \texttt{InferenceEngine} (\texttt{edge/inference\_engine.py})
+carica il checkpoint\footnote{File contenente i pesi numerici di una rete
+già allenata, salvato al termine del training e ricaricato in memoria per
+eseguire nuove predizioni senza dover riaddestrare il modello.} del modello
+(full precision oppure una delle varianti compresse, Sezione~\ref{sec:compressione}),
+esegue l'inferenza sul tensore fornito dalla fotocamera misurando il tempo
+di esecuzione al millisecondo, applica la softmax ai logits restituiti dal
+modello per ottenere una confidenza interpretabile, e simula i vincoli di
+un dispositivo Edge limitando l'esecuzione a un solo thread CPU, senza GPU.
 
 \subsection{Agent Layer}
 \label{sec:agent-layer}
 
-Il modulo \texttt{agent/decision\_agent.py} implementa l'agente decisionale,
-il componente che realizza concretamente il modello \textbf{PEAS}
-introdotto nella Sezione~\ref{sec:peas}.
+Il modulo \texttt{agent/decision\_agent.py} implementa l'agente
+decisionale, caratterizzato secondo il modello PEAS in
+Tabella~\ref{tab:peas}.
 
 \begin{table}[h]
 \centering
@@ -118,13 +83,13 @@ Sensors & Fotocamera virtuale, sensori ambientali virtuali. \\
 \label{tab:peas}
 \end{table}
 
-Dal punto di vista della tassonomia degli agenti, il \texttt{DecisionAgent}
-si qualifica come \textbf{agente reattivo basato su modello e su obiettivi}:
+L'agente è di tipo \textbf{reattivo basato su modello e su obiettivi}:
 mantiene uno stato interno (il contatore di rilevamenti di malattia
-consecutivi, utile per distinguere un singolo rilevamento isolato da
-un'epidemia in corso) e sceglie le proprie azioni tramite un insieme di
-regole a priorità decrescente, riportate in Tabella~\ref{tab:regole-agente}.
+consecutivi, per distinguere un rilevamento isolato da un'epidemia in
+corso) e sceglie le proprie azioni tramite le regole a priorità decrescente
+in Tabella~\ref{tab:regole-agente}.
 
+\clearpage
 \begin{table}[h]
 \centering
 \small
@@ -146,104 +111,68 @@ regole a priorità decrescente, riportate in Tabella~\ref{tab:regole-agente}.
 \label{tab:regole-agente}
 \end{table}
 
-Un aspetto rilevante da chiarire riguarda la regola 1: contrariamente a
-un'interpretazione intuitiva, la richiesta di "ispezione umana" scatta
-quando la confidenza della CNN è \emph{inferiore} alla soglia (di default
-70\%, valore configurabile e scelto come convenzione di progetto, non
-derivato da un'analisi statistica dei dati), non quando è superiore. La
-soglia rappresenta quindi un meccanismo di cautela: se il modello non è
-sufficientemente sicuro della propria predizione, il sistema segnala la
-necessità di una verifica esterna, invece di agire automaticamente sulla
-base di una diagnosi incerta.
+La regola 1 va letta con attenzione, perché il suo effetto è opposto a
+quanto ci si aspetterebbe intuitivamente: l'allarme "ispezione umana"
+\emph{non} scatta quando il modello è molto sicuro della diagnosi, ma
+quando lo è \emph{poco} (confidenza sotto il 70\%, soglia configurabile).
+È un meccanismo di cautela: se la rete non è sufficientemente sicura, il
+sistema segnala che serve una verifica esterna invece di agire
+automaticamente su una diagnosi incerta.
 
 \begin{warnbox}
-Nell'implementazione attuale, la richiesta di "ispezione umana" è
-\emph{simbolica}: si traduce nell'attivazione di un allarme visivo e nella
-generazione di una notifica testuale, ma il ciclo automatico
-sense-think-act-log prosegue comunque al passo successivo senza attendere
-un effettivo intervento dell'operatore umano. Questo limite, e le possibili
-estensioni per renderlo funzionalmente bloccante, sono discussi nella
-Sezione~\ref{sec:limiti}.
+Nell'implementazione attuale questa richiesta è \emph{simbolica}: attiva un
+allarme visivo e una notifica testuale, ma il ciclo prosegue comunque al
+passo successivo senza attendere un intervento umano effettivo
+(Sezione~\ref{sec:limiti}).
 \end{warnbox}
 
 \subsection{Actuator Layer}
 
-Il livello di attuazione è realizzato da due moduli distinti, che riflettono
-la separazione fra hardware (simulato) e logica applicativa.
+Il livello di attuazione (\texttt{actuators/}) simula l'hardware di uscita
+della serra: \texttt{fake\_gpio.py} replica l'interfaccia della libreria
+ufficiale \texttt{RPi.GPIO}\footnote{\emph{General Purpose Input/Output}: i
+piedini fisici di una scheda come il Raspberry Pi, usati per pilotare
+dispositivi elettrici reali.} senza pilotare hardware reale (sostituendo
+l'import con quello ufficiale, il codice funzionerebbe su una scheda vera
+senza altre modifiche); \texttt{actuators.py} definisce gli attuatori stessi.
+La Figura~\ref{fig:diagramma-classi} mostra le relazioni fra le classi
+coinvolte: tre attuatori (irrigazione, ventilazione, allarme) condividono
+la stessa logica di attivazione/disattivazione, la notifica è un caso a
+parte (nessun pin fisico), e un registro centrale li aggrega per l'agente.
 
-\subsubsection{Interfaccia GPIO simulata (\texttt{actuators/fake\_gpio.py})}
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+    box/.style={draw, rounded corners, minimum width=3.4cm, minimum height=0.9cm,
+        align=center, font=\small},
+    node distance=1cm and 1cm,
+]
+\node[box, fill=pomodoroTeal!10, draw=pomodoroTeal] (base) {SimulatedActuator};
+\node[box, below left=1.3cm and -0.6cm of base] (irr) {IrrigationActuator};
+\node[box, below=1.3cm of base] (vent) {VentilationActuator};
+\node[box, below right=1.3cm and -0.6cm of base] (alarm) {AlarmActuator};
+\node[box, right=2.2cm of base, fill=pomodoroAmber!10, draw=pomodoroAmber] (notif) {NotificationActuator};
+\node[box, above=1.1cm of base, fill=pomodoroPurple!8, draw=pomodoroPurple] (bank) {ActuatorBank};
 
-\textbf{GPIO} (\emph{General Purpose Input/Output}) indica i piedini fisici
-di una scheda come il Raspberry Pi, utilizzabili via software per pilotare
-dispositivi elettrici reali. Il modulo \texttt{fake\_gpio.py} replica
-fedelmente l'interfaccia pubblica della libreria ufficiale \texttt{RPi.GPIO}
-(le stesse costanti e le stesse funzioni: \texttt{setmode}, \texttt{setup},
-\texttt{output}, \texttt{input}, \texttt{cleanup}), mantenendo tuttavia lo
-stato dei "pin" esclusivamente in una struttura dati Python, senza pilotare
-alcun hardware reale. Questa scelta implementativa rende il codice del
-livello di attuazione immediatamente riutilizzabile su hardware reale:
-sarebbe sufficiente sostituire l'istruzione di importazione del modulo
-(\texttt{from actuators import fake\_gpio as GPIO}) con
-\texttt{import RPi.GPIO as GPIO}, senza alcuna altra modifica.
-
-\subsubsection{Banco attuatori (\texttt{actuators/actuators.py})}
-
-Il modulo definisce una gerarchia di classi basata sull'ereditarietà, il
-meccanismo standard della programmazione orientata agli oggetti per
-condividere comportamento comune fra più classi specializzate senza
-duplicare codice. La classe base \texttt{SimulatedActuator} implementa, una
-sola volta, la logica di attivazione/disattivazione (gestione dello stato
-interno, chiamata all'interfaccia GPIO, generazione di un log
-strutturato dell'azione); le classi \texttt{IrrigationActuator},
-\texttt{VentilationActuator} e \texttt{AlarmActuator} ereditano da essa,
-specializzandola solo con un nome descrittivo e un numero di pin distinto,
-senza reintrodurre alcuna logica propria. La classe
-\texttt{NotificationActuator}, priva di un pin fisico associato, simula
-l'invio di una notifica testuale con livello di gravità (informativo,
-warning, critico). Infine, la classe \texttt{ActuatorBank} aggrega i quattro
-attuatori in un unico punto di accesso, semplificando l'interazione da
-parte dell'agente decisionale e fornendo un metodo di utilità per
-disattivare tutti gli attuatori contemporaneamente (usato, ad esempio, alla
-chiusura ordinata del programma).
+\draw[-{Triangle[open,length=3mm]}, thick] (irr) -- (base);
+\draw[-{Triangle[open,length=3mm]}, thick] (vent) -- (base);
+\draw[-{Triangle[open,length=3mm]}, thick] (alarm) -- (base);
+\draw[-{Diamond}, thick] (bank) -- (base);
+\draw[-{Diamond}, thick] (bank) -- (notif);
+\end{tikzpicture}
+\caption{Relazioni fra le classi del livello di attuazione: freccia vuota = ereditarietà, rombo = aggregazione.}
+\label{fig:diagramma-classi}
+\end{figure}
 
 \subsection{Orchestrazione: CLI e Dashboard}
 
-\subsubsection{Orchestratore da riga di comando (\texttt{orchestrator/main\_loop.py})}
-
-Il modulo implementa la classe \texttt{Orchestrator}, che istanzia tutti i
-componenti di dominio descritti in questa sezione e ne coordina l'esecuzione
-in un ciclo continuo, oltre alla classe \texttt{PoCLogger}, responsabile
-della scrittura strutturata su file CSV di ogni ciclo eseguito (timestamp,
-etichetta reale, predizione, confidenza, tempo di inferenza, valori
-ambientali, stato degli attuatori). L'orchestratore gestisce inoltre in modo
-esplicito l'interruzione da tastiera (CTRL+C), garantendo che tutti gli
-attuatori vengano disattivati e il file di log chiuso correttamente prima
-della terminazione del processo.
-
-\subsubsection{Dashboard interattiva (\texttt{dashboard/app\_streamlit.py})}
-
-La dashboard, realizzata con il framework \emph{Streamlit} e la libreria di
-visualizzazione \emph{Plotly}, riproduce lo stesso identico ciclo
-sense-think-act-log all'interno di un'interfaccia web, offrendo:
-
-\begin{itemize}
-    \item visualizzazione in tempo reale dell'immagine analizzata e delle
-    probabilità softmax calcolate dalla CNN per ciascuna delle 10 classi;
-    \item indicatori grafici (\emph{gauge chart}) per i valori dei sensori
-    ambientali simulati, con andamento storico;
-    \item indicatori di stato per ciascun attuatore, e visualizzazione del
-    ragionamento dell'agente decisionale (le stringhe esplicative generate
-    dalle regole condizione-azione);
-    \item un pannello di monitoraggio delle risorse (CPU, RAM, numero di
-    thread, latenza media di inferenza), a rappresentare i vincoli tipici
-    di un dispositivo Edge;
-    \item grafici di analisi aggregata: accuratezza cumulativa nel tempo,
-    distribuzione delle predizioni, istogramma delle latenze, confronto fra
-    le diverse varianti di compressione del modello.
-\end{itemize}
-
-Un controllo aggiuntivo, discusso nella Sezione~\ref{sec:compressione},
-consente di selezionare manualmente quale specifica variante compressa del
-modello utilizzare, in modo da poter dimostrare interattivamente
-l'effettivo trade-off fra dimensione, velocità e accuratezza introdotto da
-ciascuna tecnica.
+Il ciclo sense-think-act-log è eseguito da due programmi equivalenti, che
+istanziano gli stessi componenti di dominio ma con interfacce diverse:
+\texttt{orchestrator/main\_loop.py} lo esegue da riga di comando, in un
+ciclo continuo che registra ogni passo su file CSV; \texttt{dashboard/app\_streamlit.py}
+lo riproduce in un'interfaccia web (Streamlit), mostrando in tempo reale
+l'immagine analizzata, le probabilità della CNN, lo stato dei sensori e
+degli attuatori, e alcuni grafici aggregati (accuratezza nel tempo,
+distribuzione delle predizioni, confronto fra le varianti compresse).
+Entrambi i programmi sono descritti operativamente nella
+Sezione~\ref{sec:esecuzione}.

@@ -6,9 +6,26 @@
 \input{copertina}
 
 \newpage
+\begin{center}
+{\Large\bfseries Sommario}
+\end{center}
+\vspace{0.4cm}
+\noindent
+PomodorIA è un Proof of Concept software che simula una serra domotica per
+il pomodoro basata su Edge AI: una rete neurale convoluzionale (CNN),
+già allenata a riconoscere 9 patologie fogliari più lo stato di pianta sana,
+viene compressa (pruning e quantizzazione) e integrata in un ciclo continuo
+sense-think-act-log, insieme a sensori ambientali simulati e a un agente
+decisionale razionale (modello PEAS) che ne combina gli output secondo il
+principio della Data Fusion. Il documento descrive l'architettura del
+sistema, mappata sul modello IoT World Forum a sette livelli, il modello di
+Machine Learning alla base della diagnosi, i singoli moduli software, la
+pipeline di compressione per l'Edge con i relativi risultati sperimentali,
+una guida operativa all'esecuzione del progetto, e i limiti noti con le
+possibili estensioni future.
+
+\newpage
 \tableofcontents
-\listoffigures
-\listoftables
 
 \input{sections/01_introduzione}
 \input{sections/02_contesto_teorico}

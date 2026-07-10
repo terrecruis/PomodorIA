@@ -2,6 +2,19 @@
 % Copertina
 % ══════════════════════════════════════════════════════════════
 \begin{titlepage}
+
+\AddToShipoutPictureBG*{
+\begin{tikzpicture}[remember picture,overlay]
+    \node[
+        anchor=south east,
+        opacity=0.18
+    ] at ([xshift=3cm,yshift=-0.4cm]current page.south east)
+    {
+        \includegraphics[width=22cm]{Assets/cover_image.png}
+    };
+\end{tikzpicture}
+}
+
 \thispagestyle{empty}
 \begin{center}
 
@@ -19,12 +32,12 @@
 }
 
 \vspace{0.5cm}
-{\scshape\large Dipartimento di Ingegneria Elettrica\\ e delle Tecnologie dell'Informazione (DIETI)\par}
+{\scshape\large Dipartimento di Ingegneria Elettrica\\ e delle Tecnologie dell'Informazione\par}
 
 \vspace{0.6cm}
 {\scshape\large Corso di Laurea Magistrale in Informatica\par}
 \vspace{0.15cm}
-{\large Esame di Internet of Things\par}
+{\large Esame di Operating Systems for mobile, cloud and IoT\par}
 
 \vspace{1.4cm}
 {\Huge\bfseries PomodorIA\par}
@@ -43,22 +56,12 @@
 \begin{minipage}[b]{0.55\textwidth}
     \raggedright
     \textbf{Autori}\\[4pt]
-    Gianmarco Vellotti \quad N\textsuperscript{o} matricola: \emph{da completare}\\
-    Francesco Terrecuso \quad N\textsuperscript{o} matricola: \emph{da completare}\\[10pt]
+    Gianmarco Vellotti \quad N\textsuperscript{o} DE5000041\\
+    Francesco Terrecuso \quad N\textsuperscript{o} DE5000005 \\[10pt]
     \textbf{Docente}\\[4pt]
     Prof. Silvio Barra
 \end{minipage}
 \hfill
-\begin{minipage}[b]{0.38\textwidth}
-    \raggedleft
-    \IfFileExists{Assets/cover_image.jpg}{%
-        \includegraphics[width=\textwidth]{Assets/cover_image.jpg}
-    }{%
-        \fbox{\parbox[c][3.4cm][c]{0.95\textwidth}{\centering\ttfamily\footnotesize
-        Immagine di copertina\\ \vspace{2pt}\tiny(inserire Assets/cover\_image.jpg\\
-        --- es. foglia di pomodoro / serra)}}
-    }
-\end{minipage}
 
 \vspace{0.4cm}
 

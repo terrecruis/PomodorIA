@@ -1,127 +1,63 @@
 \section{Il modello di Machine Learning}
 \label{sec:modello-ml}
 
-\subsection{Origine e dataset}
+\subsection{Origine, dataset e scelta architetturale}
 
 Il modello di riconoscimento utilizzato in PomodorIA non è stato addestrato
-da zero nell'ambito di questo progetto, ma riutilizza il lavoro svolto nel
-progetto dell'esame di \emph{Neural Networks}, in cui è stata confrontata
+da zero nell'ambito di questo progetto, ma riutilizza il lavoro svolto in un
+esame precedente~[\ref{bib:cnntomato}], in cui è stata confrontata
 sperimentalmente una rete completamente connessa (FCNN) con una rete
-convoluzionale (CNN) sullo stesso compito di classificazione.
+convoluzionale (CNN) sul dataset \textbf{PlantVillage -- Tomato}~[\ref{bib:dataset}]
+(14.529 immagini, 10 classi: 9 patologie fogliari più la classe "sana").
 
-Il dataset utilizzato è \textbf{PlantVillage -- Tomato}, un sottoinsieme del
-noto dataset pubblico PlantVillage, composto da 14.529 immagini di foglie di
-pomodoro suddivise in 10 classi (9 patologie più la classe "sana"):
-\emph{Bacterial Spot}, \emph{Early Blight}, \emph{Late Blight}, \emph{Leaf
-Mold}, \emph{Septoria Leaf Spot}, \emph{Spider Mites}, \emph{Target Spot},
-\emph{Tomato Yellow Leaf Curl Virus}, \emph{Tomato Mosaic Virus},
-\emph{Healthy}.
-
-\subsection{Confronto FCNN vs CNN}
-
-La Tabella~\ref{tab:fcnn-vs-cnn} riassume i risultati del confronto
-sperimentale condotto nel progetto di origine, che ha motivato la scelta
-della CNN come modello da portare in produzione nel sistema Edge.
+La Tabella~\ref{tab:fcnn-vs-cnn} riassume l'esito di quel confronto, che ha
+motivato la scelta della CNN come modello da portare in produzione nel
+sistema Edge: una rete completamente connessa tratta l'immagine come un
+vettore piatto di pixel, perdendo l'informazione sulla struttura spaziale, e
+per questo confonde più facilmente patologie visivamente simili; la CNN,
+grazie ai filtri convoluzionali, cattura pattern spaziali locali (bordi,
+texture, forma delle macchie fogliari) risultando nettamente più accurata.
 
 \begin{table}[h]
 \centering
 \small
-\begin{tabular}{@{}lcc@{}}
+\begin{tabular}{@{}p{4.6cm}p{4.2cm}p{4.2cm}@{}}
 \toprule
 & \textbf{FCNN [2L-512-ReLU]} & \textbf{CNN [64f-k3-3blk]} \\
 \midrule
 Accuracy (holdout 80/20) & $\sim$84\% & $\sim$96\% \\
-Accuracy media (Stratified 5-Fold) & --- & 94,98\% ($\sigma < 3,2\%$) \\
 Recall minimo per classe & 0,69 (Target Spot) & 0,90 \\
-Punto debole & Confonde le patologie fungine per assenza di struttura spaziale & Classi rare (Tomato Mosaic Virus, 299 immagini) più critiche \\
+Punto debole & Confonde patologie fungine simili & Classi rare più critiche \\
 \bottomrule
 \end{tabular}
 \caption{Confronto tra rete completamente connessa (FCNN) e rete convoluzionale (CNN).}
 \label{tab:fcnn-vs-cnn}
 \end{table}
 
-Il risultato conferma un principio atteso per compiti di visione artificiale:
-una rete completamente connessa tratta l'immagine come un vettore piatto di
-pixel, perdendo ogni informazione sulla struttura spaziale bidimensionale;
-per questo motivo confonde sistematicamente patologie visivamente simili ma
-distinte (Early Blight, Late Blight, Bacterial Spot). La CNN, al contrario,
-grazie ai filtri convoluzionali che operano localmente sull'immagine,
-riesce a catturare pattern spaziali (bordi, texture, forma delle macchie
-fogliari) risultando nettamente più accurata.
-
 \subsection{Architettura della CNN: \texttt{TomatoCNN}}
 
 Il modello scelto per il deployment Edge è la configurazione
 \texttt{CNN~[64f-k3-3blk]}: 64 filtri iniziali, kernel $3\times3$, 3 blocchi
-convoluzionali. L'architettura, implementata nella classe \texttt{TomatoCNN}
-(condivisa fra il progetto di origine e PomodorIA), è composta da:
+convoluzionali, per un totale di 8.765.066 parametri (33,44 MB su disco in
+formato float32). L'architettura è composta da:
 
 \begin{itemize}
-    \item una sequenza di \textbf{3 blocchi convoluzionali}, ciascuno
-    composto da uno strato \texttt{Conv2d} (filtro convoluzionale), uno
-    strato di attivazione \texttt{ReLU} (non-linearità) e uno strato di
-    \texttt{MaxPool2d} (riduzione della dimensione spaziale). Il numero di
-    filtri raddoppia ad ogni blocco (64 $\to$ 128 $\to$ 256), mentre la
-    dimensione spaziale dell'immagine si dimezza ad ogni blocco
-    ($64\times64 \to 32\times32 \to 16\times16 \to 8\times8$);
-    \item un \textbf{classificatore} completamente connesso, composto da uno
-    strato \texttt{Linear} (16.384 $\to$ 512 neuroni), \texttt{ReLU},
-    \texttt{Dropout(0.5)} (regolarizzazione anti-overfitting, attiva solo
-    in fase di training) e uno strato \texttt{Linear} finale (512 $\to$ 10
-    neuroni, uno per classe).
+    \item una sequenza di \textbf{3 blocchi convoluzionali} (\texttt{Conv2d}
+    $\to$ \texttt{ReLU} $\to$ \texttt{MaxPool2d}), che raddoppiano il numero
+    di filtri (64 $\to$ 128 $\to$ 256) e dimezzano la dimensione spaziale
+    dell'immagine ad ogni blocco ($64\times64 \to 8\times8$);
+    \item un \textbf{classificatore} completamente connesso
+    (\texttt{Linear} $\to$ \texttt{ReLU} $\to$ \texttt{Dropout} $\to$
+    \texttt{Linear}) che produce 10 valori grezzi (\emph{logits}), uno per
+    classe -- la loro trasformazione in probabilità (softmax) è applicata
+    dal motore di inferenza, descritto nella Sezione~\ref{sec:edge-layer}.
 \end{itemize}
-
-La Tabella~\ref{tab:cnn-shapes} riporta l'evoluzione della dimensione dei
-tensori attraverso la rete.
-
-\begin{table}[h]
-\centering
-\small
-\begin{tabular}{@{}lcc@{}}
-\toprule
-\textbf{Passo} & \textbf{Dimensione spaziale} & \textbf{Canali (filtri)} \\
-\midrule
-Input & $64\times64$ & 3 (RGB) \\
-Dopo blocco 1 & $32\times32$ & 64 \\
-Dopo blocco 2 & $16\times16$ & 128 \\
-Dopo blocco 3 & $8\times8$ & 256 \\
-\bottomrule
-\end{tabular}
-\caption{Evoluzione della dimensione del tensore attraverso i blocchi convoluzionali di \texttt{TomatoCNN}.}
-\label{tab:cnn-shapes}
-\end{table}
-
-Il modello, con questa configurazione, conta 8.765.066 parametri totali e
-occupa circa 33,44 MB su disco in formato float32 (precisione piena).
 
 \subsection{Preprocessing dell'immagine}
 
-Per garantire la coerenza fra la fase di training e la fase di inferenza in
-PomodorIA, ogni immagine subisce esattamente la stessa pipeline di
-preprocessing applicata in fase di addestramento:
-
-\begin{enumerate}
-    \item ridimensionamento a $64\times64$ pixel, formato RGB;
-    \item conversione in tensore numerico;
-    \item normalizzazione con media e deviazione standard tipiche del
-    dataset ImageNet ($\text{mean}=[0.485, 0.456, 0.406]$,
-    $\text{std}=[0.229, 0.224, 0.225]$), una convenzione standard
-    nell'ambito del \emph{transfer learning} e della visione artificiale;
-    \item nessuna \emph{data augmentation} (flip, rotazione) in fase di
-    inferenza: queste tecniche sono utili solo durante il training, per
-    aumentare artificialmente la variabilità dei dati di addestramento.
-\end{enumerate}
-
-\subsection{Uscita del modello: logits e softmax}
-
-Il modello, in output, produce 10 valori numerici grezzi (\emph{logits}),
-non ancora interpretabili come probabilità. La trasformazione in probabilità
-(valori compresi fra 0 e 1, la cui somma è pari a 1) avviene tramite la
-funzione \textbf{softmax}, applicata esplicitamente dal motore di inferenza
-(Sezione~\ref{sec:edge-layer}) dopo l'esecuzione della rete. Questa
-separazione riflette una convenzione standard di PyTorch: durante il
-training, la funzione di perdita \texttt{CrossEntropyLoss} riceve i logits
-grezzi e applica internamente la softmax in modo numericamente più stabile
-ed efficiente; in fase di inferenza, invece, la softmax va applicata
-esplicitamente per ottenere un valore di confidenza interpretabile
-dall'utente finale.
+Ogni immagine, prima di essere passata alla rete, viene ridimensionata a
+$64\times64$ pixel RGB e normalizzata con media e deviazione standard
+tipiche del dataset ImageNet ($\text{mean}=[0.485, 0.456, 0.406]$,
+$\text{std}=[0.229, 0.224, 0.225]$) -- la stessa pipeline usata in fase di
+addestramento, condizione necessaria perché la rete funzioni correttamente
+in inferenza.
