@@ -33,7 +33,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from typing import Optional
-from collections import deque
+from collections import deque, Counter
 
 from sensors.environment_simulator import EnvironmentReading
 from edge.inference_engine import InferenceResult
@@ -125,7 +125,10 @@ class DecisionAgent:
 
     Mantiene stato interno tra un ciclo e l'altro:
         - _consecutive_disease_count: quanti cicli consecutivi con malattia
-        - _last_predictions: deque degli ultimi N risultati (finestra scorrevole)
+          (statistica di comportamento, mostrata in dashboard)
+        - _recent_categories: deque delle categorie di malattia recenti
+          (finestra scorrevole, usata per rilevare le epidemie)
+        - _last_predictions: deque degli ultimi N risultati
         - _action_history: storico delle azioni eseguite
 
     Le soglie operative sono lette dal config.yaml (sezione "agent").
@@ -143,7 +146,11 @@ class DecisionAgent:
 
         # ── Stato interno ────────────────────────────────────
         self._consecutive_disease_count: int = 0
-        self._last_predictions: deque = deque(maxlen=10)  # finestra scorrevole
+        self._last_predictions: deque = deque(maxlen=10)  # finestra scorrevole (predizioni)
+        # Finestra scorrevole delle categorie di malattia, usata per rilevare
+        # un'epidemia come alta frequenza della STESSA categoria fra le ultime
+        # scansioni (non come semplice sequenza di malattie qualsiasi).
+        self._recent_categories: deque = deque(maxlen=self._epidemic_window)
         self._action_history: list[AgentDecision] = []
         self._total_cycles: int = 0
         self._correct_decisions: int = 0   # per metriche di comportamento
@@ -153,7 +160,7 @@ class DecisionAgent:
             f"conf={self._conf_threshold:.0%}, "
             f"hum={self._humidity_high}%, "
             f"soil={self._soil_low}%, "
-            f"consecutive={self._consecutive_threshold}"
+            f"epidemia={self._epidemic_min_count}/{self._epidemic_window}"
         )
 
     def _load_thresholds(self) -> None:
@@ -162,7 +169,8 @@ class DecisionAgent:
         self._conf_threshold         = cfg.get("confidence_threshold", 0.70)
         self._humidity_high          = cfg.get("humidity_high_threshold", 80.0)
         self._soil_low               = cfg.get("soil_moisture_low_threshold", 30.0)
-        self._consecutive_threshold  = cfg.get("consecutive_alerts_threshold", 3)
+        self._epidemic_window        = cfg.get("epidemic_window", 10)
+        self._epidemic_min_count     = cfg.get("epidemic_min_count", 3)
         self._temp_high              = cfg.get("temperature_high", 35.0)
         self._temp_low               = cfg.get("temperature_low", 10.0)
         self._light_low              = cfg.get("light_low_threshold", 2000.0)
@@ -187,7 +195,8 @@ class DecisionAgent:
             4. Malattia batterica/parassita → notifica WARNING
             5. Soil moisture bassa → irrigazione
             6. Temperatura alta → ventilazione (indipendente dalla malattia)
-            7. N rilevamenti consecutivi → alarm (epidemia simulata)
+            7. Stessa categoria di malattia frequente nella finestra recente
+               → alarm epidemia
             8. Healthy → disattiva tutto + notifica OK se si esce da malattia
 
         Args:
@@ -206,8 +215,10 @@ class DecisionAgent:
         label = inference.predicted_label
         conf  = inference.confidence
 
-        # Classifica la malattia predetta
+        # Classifica la malattia predetta e aggiorna la finestra scorrevole
+        # delle categorie (serve al rilevamento dell'epidemia, Regola 7)
         disease_category = self._classify_disease(label)
+        self._recent_categories.append(disease_category)
 
         # ══════════════════════════════════════════════════════
         # REGOLA 1: Confidenza bassa → human-in-the-loop
@@ -321,22 +332,24 @@ class DecisionAgent:
         actions += self._handle_environmental(env, reasoning)
 
         # ══════════════════════════════════════════════════════
-        # REGOLA 7: N rilevamenti consecutivi → allarme epidemia
+        # REGOLA 7: epidemia = alta frequenza della STESSA categoria
+        #           di malattia nella finestra delle ultime scansioni
         # ══════════════════════════════════════════════════════
-        if self._consecutive_disease_count >= self._consecutive_threshold:
+        epidemic_cat, epidemic_count = self._detect_epidemic()
+        if epidemic_cat is not None:
             reasoning.append(
-                f"🚨 {self._consecutive_disease_count} rilevamenti malattia "
-                f"consecutivi (soglia={self._consecutive_threshold}) → "
-                "ALLARME EPIDEMIA"
+                f"🚨 {epidemic_count}/{len(self._recent_categories)} scansioni "
+                f"recenti sono di categoria '{epidemic_cat}' "
+                f"(soglia={self._epidemic_min_count}) → ALLARME EPIDEMIA"
             )
             actions.append(self.actuators.alarm.activate(
-                f"epidemia simulata: {self._consecutive_disease_count} "
-                f"rilevamenti consecutivi di malattia"
+                f"epidemia '{epidemic_cat}': {epidemic_count} rilevamenti "
+                f"nelle ultime {len(self._recent_categories)} scansioni"
             ))
             actions.append(self.actuators.notification.send(
-                f"ATTENZIONE: {self._consecutive_disease_count} rilevamenti "
-                f"consecutivi di malattia. Ultima: '{label}'. "
-                "Intervento urgente richiesto.",
+                f"ATTENZIONE: possibile epidemia di tipo '{epidemic_cat}' "
+                f"({epidemic_count} rilevamenti su {len(self._recent_categories)} "
+                "scansioni recenti). Intervento urgente richiesto.",
                 severity="CRITICAL",
             ))
 
@@ -423,13 +436,42 @@ class DecisionAgent:
 
         return actions
 
+    def _detect_epidemic(self) -> tuple[Optional[str], int]:
+        """
+        Rileva un'epidemia come alta frequenza della STESSA categoria di
+        malattia nella finestra scorrevole delle ultime scansioni.
+
+        A differenza di un semplice contatore di malattie consecutive (che
+        scatterebbe anche su patologie diverse e scorrelate rilevate di
+        seguito), questo approccio riflette il concetto reale di epidemia --
+        il focolaio di UNA specifica patologia -- ed è più robusto: tollera
+        errori isolati del modello e il campionamento casuale di piante
+        diverse ad ogni ciclo.
+
+        Returns:
+            (categoria, conteggio) se una categoria di malattia raggiunge la
+            soglia nella finestra, altrimenti (None, 0).
+        """
+        disease_cats = [
+            c for c in self._recent_categories
+            if c not in ("healthy", "unknown")
+        ]
+        if not disease_cats:
+            return None, 0
+        top_cat, top_count = Counter(disease_cats).most_common(1)[0]
+        if top_count >= self._epidemic_min_count:
+            return top_cat, top_count
+        return None, 0
+
     def _update_consecutive(
         self,
         label: str,
         actions: list,
         reasoning: list,
     ) -> None:
-        """Aggiorna il contatore dei rilevamenti consecutivi."""
+        """Aggiorna il contatore dei rilevamenti consecutivi (statistica
+        mostrata in dashboard; il rilevamento epidemia usa invece
+        _detect_epidemic)."""
         if label != HEALTHY_CLASS:
             self._consecutive_disease_count += 1
         else:

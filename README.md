@@ -14,7 +14,7 @@
 ![Status](https://img.shields.io/badge/Status-PoC%20Attivo-brightgreen)
 
 **Autori:** Vellotti Gianmarco, Terrecuso Francesco
-**Corso:** Internet of Things — Università degli Studi di Napoli Federico II
+**Corso:** Operating Systems for mobile, cloud and IoT — Università degli Studi di Napoli Federico II
 **Modello ML di partenza:** TomatoCNN (progetto P14, esame di Neural Networks)
 
 </div>
@@ -171,10 +171,13 @@ class SensorReading:
   ImageNet).
 - Esegue l'inferenza e restituisce: classe predetta, confidenza (softmax),
   tempo di inferenza (ms) — utile per le metriche di performance edge.
-- Deve poter girare in due modalità, selezionabili da config, per confrontarle
-  nella relazione:
+- Gira in due modalità, selezionabili da config (`model.mode`), per
+  confrontarle nella relazione:
   - `full_precision` → modello originale `.pth` (baseline)
-  - `optimized` → modello quantizzato/pruned (target edge)
+  - `optimized` → modello compresso (target edge). In questa modalità,
+    `model.optimized_variant` sceglie quale variante caricare:
+    `onnx` (solo quantizzato), `pruned_quantized`, `pruned`, oppure `auto`
+    (cascata: ONNX → pruned+quant → pruned → fallback a full_precision).
 
 ### 3.3 Agente Decisionale (PEAS)
 
@@ -263,7 +266,8 @@ accuracy/dimensione/latenza — è il cuore "tecnico" della parte Edge AI.
   tempi, a meno di usare formati sparsi.
 - **Structured pruning** (rimozione di interi filtri/canali convoluzionali,
   `ln_structured` su `dim=0`): più efficace su CPU (Raspberry Pi) perché
-  riduce davvero le operazioni, non solo azzera pesi.
+  riduce davvero le operazioni, non solo azzera pesi. **È la tecnica adottata
+  nella pipeline** (`models/compress.py`), con norma L1 e sparsità del 30%.
 
 ### 4.2 Quantizzazione
 
@@ -284,16 +288,16 @@ accuracy/dimensione/latenza — è il cuore "tecnico" della parte Edge AI.
 
 ### 4.3 Risultati sperimentali di compressione
 
-Dalla suite di benchmark implementata (`benchmarks/benchmark_compression.py`), abbiamo misurato le seguenti performance sulla nostra architettura:
+La suite di benchmark è implementata in `models/compress.py` (eseguita automaticamente al termine della pipeline di compressione) e salva i risultati in `benchmarks/benchmark_results.csv`. Le performance misurate sulla nostra architettura, sul test set corretto:
 
-| Variante | Accuracy | Dimensione su disco | Latenza media (CPU, 1 thread) | Parametri totali / non nulli | Sparsità | RAM processo |
-|---|---|---|---|---|---|---|
-| **Baseline (float32)** | **99.2%** | 33.44 MB | 2.28 ms | 8,765,066 / 8,765,066 | 0.0% | 404 MB |
-| **Pruned (L1 Unstructured, 30%)** | 86.0% | 33.44 MB | 2.28 ms | 8,765,066 / 8,653,961 | 1.3% | 293 MB |
-| **Pruned + Dynamic Quant (INT8)** | 86.2% | **9.43 MB** | 2.98 ms | 370,816 / 259,711 | 30.0% | 339 MB |
-| **ONNX Runtime (float32/INT8)** | **99.2%** | — | **1.58 ms** | — | — | 746 MB |
+| Variante | Accuracy | Dimensione su disco | Latenza media (CPU, 1 thread) | Parametri totali / non nulli | Sparsità |
+|---|---|---|---|---|---|
+| **Baseline (float32)** | **95.0%** | 33.44 MB | 3.33 ms | 8,765,066 / 8,765,066 | 0.0% |
+| **Pruned (Structured, 30%)** | 82.2% | 33.44 MB | 3.28 ms | 8,765,066 / 8,653,961 | 1.3% |
+| **Pruned + Dynamic Quant (INT8)** | 82.2% | 9.43 MB | 4.32 ms | 370,816 / 259,711 | 30.0% |
+| **ONNX Quantized (INT8)** | **95.0%** | **8.37 MB** | 6.10 ms | — | — |
 
-> **Nota sui risultati Edge**: La quantizzazione dinamica (`Pruned + Dynamic Quant`) riduce la dimensione del modello di **~3.5x** (da 33.4 MB a 9.4 MB), rendendolo ideale per il caricamento nella RAM limitata di microcontrollori o schede embedded. Per quanto riguarda la velocità di esecuzione, il motore **ONNX Runtime** si dimostra il più efficiente sul nostro target CPU, abbattendo la latenza a **~1.58 ms per scatto** preservando l'accuratezza del modello originale.
+> **Nota sui risultati Edge**: la **quantizzazione ONNX** è la scelta più equilibrata: riduce la dimensione del modello di **~4x** (da 33.4 MB a 8.4 MB) preservando l'accuratezza del modello originale (95.0%), perché applica la sola quantizzazione senza pruning. Il **pruning strutturato al 30%**, applicato in un unico passo senza fine-tuning di recupero, penalizza invece sensibilmente l'accuratezza (da 95.0% a 82.2%) — è il classico trade-off tra compressione aggressiva e qualità del modello. Le latenze restano tutte nello stesso ordine di grandezza (3–6 ms) data la ridotta dimensione della rete.
 
 ---
 
@@ -307,8 +311,11 @@ PomodorIA/
 ├── models/
 │   ├── CNN_64f-k3-3blk.pth      # checkpoint originale della CNN (float32)
 │   ├── model.py                 # architettura TomatoCNN
-│   ├── compress.py              # pruning, quantizzazione dinamica, export ONNX
-│   └── optimized/               # checkpoint compressi generati (ONNX, ecc.)
+│   ├── compress.py              # pruning, quantizzazione, export ONNX + benchmark
+│   └── optimized/               # checkpoint compressi generati (ONNX, pth)
+├── scripts/
+│   └── extract_test_set.py      # estrae il test set (seed=42) per evitare data leakage
+├── plantvillage_testset/        # test set estratto (dataset_root usato dal PoC)
 ├── sensors/
 │   ├── virtual_camera.py        # fotocamera virtuale che campiona dal dataset
 │   └── environment_simulator.py # simulatore sensori T/Hum/Soil/Lux (con Data Fusion)
@@ -326,8 +333,7 @@ PomodorIA/
 ├── logs/
 │   └── run_*.csv                # log strutturati generati dai cicli
 └── benchmarks/
-    ├── benchmark_compression.py # suite di benchmark di quantizzazione e pruning
-    └── benchmark_results.csv    # risultati di performance misurati
+    └── benchmark_results.csv    # risultati di performance misurati (generati da compress.py)
 ```
 
 ---
@@ -357,12 +363,28 @@ pip install -r requirements.txt
 
 ### 6.2 Configurazione del Dataset
 
-Prima di avviare il sistema, verifica che il percorso del dataset nel file [`config.yaml`](file:///Users/francescoterrecuso/Desktop/PomodorIA/config.yaml) punti correttamente alla cartella di *PlantVillage-Tomato* presente sul tuo computer:
+Il progetto usa come `dataset_root` il **test set** (`plantvillage_testset/`, già
+incluso nell'archivio consegnato), **non** il dataset completo. Questo è
+essenziale: la CNN è stata allenata sull'80% delle immagini, quindi pescare
+dall'intero dataset la valuterebbe su immagini già viste in training, mostrando
+un'accuratezza fasulla vicina al **100%**. Verifica quindi che `config.yaml`
+punti al test set:
 
 ```yaml
 paths:
-  dataset_root: "/percorso/al/tuo/dataset/plantvillage"
+  dataset_root: "./plantvillage_testset"
+  checkpoint: "./models/CNN_64f-k3-3blk.pth"
 ```
+
+> Il test set (2.906 immagini, il 20% escluso dal training) è stato generato
+> con `scripts/extract_test_set.py`, che riproduce lo stesso split casuale
+> (`seed=42`) del progetto di training originale. Rigenerarlo è necessario solo
+> se si parte da una copia locale del dataset completo:
+> ```bash
+> python scripts/extract_test_set.py \
+>     --dataset-root "/percorso/al/dataset/plantvillage" \
+>     --output-dir "./plantvillage_testset" --mode symlink
+> ```
 
 ### 6.3 Avvio della Dashboard Real-Time
 

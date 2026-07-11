@@ -7,8 +7,8 @@ compressi in models/optimized/.
 Tecniche applicate in sequenza:
   1. Structured Pruning (ln_structured su filtri Conv2d)
      → rimuove interi filtri meno importanti → riduce le operazioni su CPU
-  2. Post-Training Static Quantization (PTQ)
-     → converte pesi float32 → int8 con calibrazione su mini-batch
+  2. Quantizzazione dinamica INT8 (torch.quantization.quantize_dynamic)
+     → converte i pesi float32 → int8, senza fase di calibrazione
   3. Export ONNX → motore di inferenza più realistico per Raspberry Pi
 
 Output generati in models/optimized/:
@@ -32,8 +32,6 @@ import time
 import copy
 import csv
 import argparse
-
-import platform
 
 import torch
 import torch.nn as nn
@@ -70,7 +68,7 @@ def load_config(config_path: str = None) -> dict:
 
 
 # ══════════════════════════════════════════════════════════════
-# Utility: carica il dataset di test per calibrazione e benchmark
+# Utility: carica il dataset di test per il benchmark
 # ══════════════════════════════════════════════════════════════
 def get_test_loader(config: dict, max_images: int = 500) -> DataLoader:
     """
@@ -93,7 +91,7 @@ def get_test_loader(config: dict, max_images: int = 500) -> DataLoader:
     dataset_root = config["paths"]["dataset_root"]
     full_dataset = datasets.ImageFolder(root=dataset_root, transform=transform)
 
-    # Prende un sottoinsieme per velocizzare calibrazione e benchmark
+    # Prende un sottoinsieme per velocizzare il benchmark
     if max_images < len(full_dataset):
         indices = list(range(0, len(full_dataset), len(full_dataset) // max_images))
         indices = indices[:max_images]
@@ -290,34 +288,8 @@ def make_pruning_permanent(model: nn.Module) -> nn.Module:
 
 
 # ══════════════════════════════════════════════════════════════
-# FASE 3: Post-Training Static Quantization
+# FASE 3: Quantizzazione dinamica INT8
 # ══════════════════════════════════════════════════════════════
-def _get_quantization_backend() -> str:
-    """
-    Seleziona automaticamente il backend di quantizzazione corretto.
-
-    - 'qnnpack' → ARM (Apple Silicon, Raspberry Pi) e x86 Linux/Mac
-    - 'fbgemm'  → x86 Linux/Windows (ottimizzato per server x86)
-
-    Su macOS con Apple Silicon fbgemm NON è disponibile perché
-    richiede estensioni x86 (AVX2) assenti su ARM.
-    Usiamo qnnpack che funziona su entrambe le architetture.
-    """
-    supported = torch.backends.quantized.supported_engines
-    if "qnnpack" in supported:
-        backend = "qnnpack"
-    elif "fbgemm" in supported:
-        backend = "fbgemm"
-    else:
-        raise RuntimeError(
-            f"Nessun backend di quantizzazione supportato. "
-            f"Disponibili: {supported}"
-        )
-    print(f"🔧 Backend quantizzazione: '{backend}' "
-          f"(rilevato automaticamente | arch: {platform.machine()})")
-    return backend
-
-
 def apply_dynamic_quantization(model: nn.Module) -> nn.Module:
     """
     Applica Dynamic Quantization ai layer Conv2d e Linear.
@@ -352,22 +324,6 @@ def apply_dynamic_quantization(model: nn.Module) -> nn.Module:
 
     print("✅ Dynamic Quantization completata | pesi float32 → INT8")
     return model_quantized
-
-
-# Alias mantenuto per compatibilità con la firma usata in run_compression_pipeline
-def apply_static_quantization(
-    model: nn.Module,
-    calibration_loader,     # ignorato, mantenuto per compatibilità firma
-    n_calibration_batches: int = 10,
-) -> nn.Module:
-    """
-    Wrapper che delega alla dynamic quantization.
-
-    La PTQ statica con torch.ao.quantization è deprecata su PyTorch >= 2.4
-    e causa errori su macOS ARM (Apple Silicon). Usiamo la dynamic quantization
-    che è più robusta e produce risultati equivalenti per l'inferenza su CPU.
-    """
-    return apply_dynamic_quantization(model)
 
 
 # ══════════════════════════════════════════════════════════════
@@ -607,7 +563,7 @@ def run_compression_pipeline(
             │         ├─── Salva model_pruned.pth
             │         └─── Benchmark pruned
             │
-            ├─── Static Quantization (calibrazione su mini-batch)
+            ├─── Quantizzazione dinamica INT8
             │         │
             │         ├─── Salva model_pruned_quantized.pth
             │         └─── Benchmark pruned+quantized
@@ -633,17 +589,15 @@ def run_compression_pipeline(
 
     classes = config["model"]["classes"]
 
-    # ── Dataset per calibrazione e benchmark ─────────────────
+    # ── Dataset per il benchmark ─────────────────────────────
     print("\n📂 Caricamento dataset per benchmark...")
     try:
         loader = get_test_loader(config, max_images=500)
-        calib_loader = get_test_loader(config, max_images=200)
         print(f"   ✓ Dataset caricato")
     except Exception as e:
         print(f"⚠️  Dataset non disponibile ({e}). "
               "Il benchmark sarà saltato, ma la compressione procede.")
         loader = None
-        calib_loader = None
 
     benchmark_results = []
 
@@ -707,30 +661,13 @@ def run_compression_pipeline(
               f"Size: {measure_file_size_mb(pruned_path):.2f}MB")
 
     # ════════════════════════════════════════════════════════
-    # STEP 3: Static Quantization
+    # STEP 3: Quantizzazione dinamica INT8
     # ════════════════════════════════════════════════════════
     print("\n" + "─" * 40)
-    print("STEP 3 — Post-Training Static Quantization (PTQ)")
+    print("STEP 3 — Quantizzazione dinamica (INT8)")
     print("─" * 40)
 
-    if calib_loader is not None:
-        model_quantized = apply_static_quantization(
-            model=model_pruned,
-            calibration_loader=calib_loader,
-            n_calibration_batches=10,
-        )
-    else:
-        # Fallback: dynamic quantization (non richiede calibration data)
-        import warnings
-        print("⚠️  Calibration data non disponibile → uso Dynamic Quantization")
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            model_quantized = torch.quantization.quantize_dynamic(
-                copy.deepcopy(model_pruned),
-                {nn.Linear, nn.Conv2d},
-                dtype=torch.qint8,
-            )
-        print("✅ Dynamic Quantization applicata")
+    model_quantized = apply_dynamic_quantization(model_pruned)
 
     # Salva modello pruned + quantizzato
     # NOTA: i modelli quantizzati PyTorch vanno serializzati con torch.save(model, ...)

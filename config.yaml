@@ -62,7 +62,8 @@ agent:
   confidence_threshold: 0.70          # sotto → "richiesta ispezione umana"
   humidity_high_threshold: 80.0       # % → ventilazione se malattia fungina
   soil_moisture_low_threshold: 30.0   # % → irrigazione
-  consecutive_alerts_threshold: 3     # N rilevamenti consecutivi → allarme
+  epidemic_window: 10                 # n. scansioni recenti considerate per l'epidemia
+  epidemic_min_count: 3               # N occorrenze della STESSA categoria nella finestra → allarme epidemia
   temperature_high: 35.0              # °C → ventilazione
   temperature_low: 10.0               # °C → alert freddo
   light_low_threshold: 2000.0         # lux → alert luce scarsa

@@ -84,10 +84,9 @@ Sensors & Fotocamera virtuale, sensori ambientali virtuali. \\
 \end{table}
 
 L'agente è di tipo \textbf{reattivo basato su modello e su obiettivi}:
-mantiene uno stato interno (il contatore di rilevamenti di malattia
-consecutivi, per distinguere un rilevamento isolato da un'epidemia in
-corso) e sceglie le proprie azioni tramite le regole a priorità decrescente
-in Tabella~\ref{tab:regole-agente}.
+mantiene uno stato interno (una finestra scorrevole delle categorie di
+malattia rilevate di recente) e sceglie le proprie azioni tramite le regole
+a priorità decrescente in Tabella~\ref{tab:regole-agente}.
 
 \clearpage
 \begin{table}[h]
@@ -103,7 +102,7 @@ in Tabella~\ref{tab:regole-agente}.
 4 & Malattia batterica o da parassiti rilevata & Notifica di livello informativo/warning \\
 5 & Umidità del suolo sotto soglia (indipendente dalla diagnosi) & Attivazione irrigazione \\
 6 & Temperatura sopra soglia (indipendente dalla diagnosi) & Attivazione ventilazione \\
-7 & N rilevamenti di malattia consecutivi $\geq$ soglia & Allarme di "epidemia" simulata \\
+7 & Stessa categoria di malattia frequente nella finestra recente & Allarme di "epidemia" della categoria rilevata \\
 8 & Pianta sana & Disattivazione di tutti gli attuatori di emergenza \\
 \bottomrule
 \end{tabular}
@@ -125,6 +124,17 @@ allarme visivo e una notifica testuale, ma il ciclo prosegue comunque al
 passo successivo senza attendere un intervento umano effettivo
 (Sezione~\ref{sec:limiti}).
 \end{warnbox}
+
+Merita una nota anche la regola 7. Poiché la fotocamera campiona ad ogni
+ciclo una pianta diversa, un'epidemia -- il focolaio di \emph{una} specifica
+patologia -- non è ben rappresentata da un semplice conteggio di malattie
+consecutive: tre rilevamenti di seguito di patologie diverse e scorrelate
+non costituiscono un focolaio. L'agente considera quindi la frequenza della
+stessa \emph{categoria} di malattia in una finestra scorrevole delle ultime
+scansioni (di default 10) e segnala un'epidemia quando una categoria supera
+una soglia minima di occorrenze (di default 3). Questo riflette il concetto
+reale di sorveglianza epidemiologica -- una soglia di prevalenza in una
+finestra temporale -- ed è più robusto agli errori isolati del modello.
 
 \subsection{Actuator Layer}
 
