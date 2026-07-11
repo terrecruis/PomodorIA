@@ -20,10 +20,9 @@ Output generati in models/optimized/:
 Utilizzo:
     python models/compress.py
     python models/compress.py --sparsity 0.5   # pruning al 50%
-    python models/compress.py --no-finetune    # salta il fine-tuning
 
-Il benchmark viene eseguito automaticamente al termine su 200 immagini
-del dataset, misurando accuracy / dimensione / latenza per ogni variante.
+Il benchmark viene eseguito automaticamente al termine sul test set,
+misurando accuracy / dimensione / latenza per ogni variante.
 """
 
 import os
@@ -549,7 +548,6 @@ def print_benchmark_table(results: list) -> None:
 # ══════════════════════════════════════════════════════════════
 def run_compression_pipeline(
     sparsity: float = 0.30,
-    skip_finetune: bool = False,
 ) -> None:
     """
     Esegue l'intera pipeline di compressione:
@@ -575,8 +573,7 @@ def run_compression_pipeline(
                       └─── Benchmark ONNX
 
     Args:
-        sparsity:      frazione di filtri da potare (0.0–1.0)
-        skip_finetune: se True, salta il fine-tuning post-pruning
+        sparsity: frazione di filtri da potare (0.0–1.0)
     """
     print("\n" + "═" * 60)
     print("  PomodorIA — Pipeline Compressione Modello (Fase 4)")
@@ -772,14 +769,6 @@ if __name__ == "__main__":
         default=0.30,
         help="Frazione di filtri Conv2d da potare (default: 0.30 = 30%%)"
     )
-    parser.add_argument(
-        "--no-finetune",
-        action="store_true",
-        help="Salta il fine-tuning post-pruning"
-    )
     args = parser.parse_args()
 
-    run_compression_pipeline(
-        sparsity=args.sparsity,
-        skip_finetune=args.no_finetune,
-    )
+    run_compression_pipeline(sparsity=args.sparsity)
