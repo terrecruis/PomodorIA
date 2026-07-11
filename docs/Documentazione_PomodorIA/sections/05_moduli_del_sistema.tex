@@ -27,7 +27,7 @@ training (situazione che produrrebbe un'accuratezza artificiosamente vicina
 al 100\%), la cartella dataset usata da PomodorIA contiene esclusivamente il
 sottoinsieme di test (20\% del dataset originale, 2.906 immagini),
 riproducendo esattamente lo split casuale del progetto di training
-originale~[\ref{bib:cnntomato}]. Le misure di accuratezza riportate in
+originale~\ref{bib:cnntomato}. Le misure di accuratezza riportate in
 questo documento (Sezione~\ref{sec:risultati}) riflettono quindi la reale
 capacità di generalizzazione del modello.
 \end{notebox}
@@ -41,7 +41,7 @@ i valori secondo un profilo statistico specifico per quella patologia
 (distribuzione gaussiana con media e deviazione standard calibrate su
 condizioni ambientali realistiche per le principali patologie fungine,
 ad es. umidità elevata e temperatura moderata per Early ed Late
-Blight~[\ref{bib:earlyblight}, \ref{bib:lateblight}]), anziché in modo
+Blight~\ref{bib:earlyblight}, \ref{bib:lateblight}), anziché in modo
 puramente casuale -- l'implementazione concreta del principio di Data
 Fusion (Sezione~\ref{sec:contesto}): la diagnosi visiva e il contesto
 ambientale, per quanto entrambi simulati, risultano tra loro plausibili.
@@ -118,23 +118,23 @@ quando lo è \emph{poco} (confidenza sotto il 70\%, soglia configurabile).
 sistema segnala che serve una verifica esterna invece di agire
 automaticamente su una diagnosi incerta.
 
+Merita una nota anche la regola 7. Poiché la fotocamera campiona ad ogni
+ciclo una pianta diversa, un'epidemia, il focolaio di \emph{una} specifica
+patologia, non è ben rappresentata da un semplice conteggio di malattie
+consecutive: tre rilevamenti di seguito di patologie diverse e scorrelate
+non costituiscono un focolaio. L'agente considera quindi la frequenza della
+stessa \emph{categoria} di malattia in una finestra scorrevole delle ultime
+scansioni (di default 10) e segnala un'epidemia quando una categoria supera
+una soglia minima di occorrenze (di default 3). Questo riflette il concetto
+reale di sorveglianza epidemiologica, una soglia di prevalenza in una
+finestra temporale, ed è più robusto agli errori isolati del modello.
+
 \begin{warnbox}
 Nell'implementazione attuale questa richiesta è \emph{simbolica}: attiva un
 allarme visivo e una notifica testuale, ma il ciclo prosegue comunque al
 passo successivo senza attendere un intervento umano effettivo
 (Sezione~\ref{sec:limiti}).
 \end{warnbox}
-
-Merita una nota anche la regola 7. Poiché la fotocamera campiona ad ogni
-ciclo una pianta diversa, un'epidemia -- il focolaio di \emph{una} specifica
-patologia -- non è ben rappresentata da un semplice conteggio di malattie
-consecutive: tre rilevamenti di seguito di patologie diverse e scorrelate
-non costituiscono un focolaio. L'agente considera quindi la frequenza della
-stessa \emph{categoria} di malattia in una finestra scorrevole delle ultime
-scansioni (di default 10) e segnala un'epidemia quando una categoria supera
-una soglia minima di occorrenze (di default 3). Questo riflette il concetto
-reale di sorveglianza epidemiologica -- una soglia di prevalenza in una
-finestra temporale -- ed è più robusto agli errori isolati del modello.
 
 \subsection{Actuator Layer}
 
@@ -173,7 +173,7 @@ parte (nessun pin fisico), e un registro centrale li aggrega per l'agente.
 \draw[-{Diamond}, thick] (bank) -- (notif);
 \end{tikzpicture}
 }
-\caption{Relazioni fra le classi del livello di attuazione: freccia vuota = ereditarietà, rombo = aggregazione.}
+\caption{Relazioni fra le classi del livello di attuazione.}
 \label{fig:diagramma-classi}
 \end{figure}
 

@@ -16,7 +16,7 @@ confronta tre approcci: pruning, quantizzazione, ed export in formato ONNX.
 
 Il \emph{pruning} ("potatura") rimuove i filtri convoluzionali meno
 rilevanti per la predizione finale. Nel progetto è realizzato con la
-funzione \texttt{torch.nn.utils.prune.ln\_structured}~[\ref{bib:pytorch}],
+funzione \texttt{torch.nn.utils.prune.ln\_structured}~\ref{bib:pytorch},
 applicata a ciascun layer \texttt{Conv2d} della rete con i seguenti
 parametri: norma \textbf{L1} ($n=1$) come criterio di importanza -- per
 ogni filtro si calcola la somma dei valori assoluti dei suoi pesi, un
@@ -49,20 +49,18 @@ La \emph{quantizzazione} converte i pesi del modello da virgola mobile a 32
 bit (float32) a un formato intero a 8 bit (INT8), riducendo la dimensione
 di un fattore prossimo a 4 e velocizzando i calcoli su CPU prive di unità
 dedicate al floating point ad alta precisione. Il progetto usa la
-\emph{quantizzazione dinamica}~[\ref{bib:pytorch}]: i pesi sono convertiti
+\emph{quantizzazione dinamica}~\ref{bib:pytorch}: i pesi sono convertiti
 in anticipo, le attivazioni (i dati che attraversano la rete durante
 l'inferenza) vengono quantizzate al volo ad ogni esecuzione, senza bisogno
 di una fase di calibrazione su dati di esempio. È applicata per due strade
-distinte: direttamente in PyTorch, oppure dopo aver esportato il modello in
-formato \textbf{ONNX}\footnote{\emph{ONNX}: formato standard indipendente
+distinte: direttamente in PyTorch, oppure dopo aver esportato il modello in formato \textbf{ONNX}\footnote{\emph{ONNX}: formato standard indipendente
 dal framework che rappresenta grafo e pesi in un unico file, eseguibile con
 \emph{ONNX Runtime}, spesso più efficiente in inferenza.} e quantizzato con
-\texttt{onnxruntime.quantization}~[\ref{bib:onnx}].
+\texttt{onnxruntime.quantization}~\ref{bib:onnx}.
 
 \subsection{Le tre varianti compresse generate}
 
-La pipeline produce tre varianti compresse, riassunte in
-Tabella~\ref{tab:varianti-compresse}, selezionabili in \texttt{config.yaml}
+La pipeline produce tre varianti compresse, riassunte di seguito, selezionabili in \texttt{config.yaml}
 o dalla dashboard.
 
 \begin{table}[h]
@@ -80,3 +78,4 @@ o dalla dashboard.
 \caption{Le tre varianti compresse prodotte dalla pipeline di \texttt{compress.py}.}
 \label{tab:varianti-compresse}
 \end{table}
+

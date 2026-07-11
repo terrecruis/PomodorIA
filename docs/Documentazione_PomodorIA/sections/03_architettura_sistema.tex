@@ -21,7 +21,7 @@ in quattro fasi che si ripetono indefinitamente:
     registrato per l'analisi successiva.
 \end{itemize}
 
-La Figura~\ref{fig:diagramma-blocchi} illustra il flusso dei dati fra i
+La seguente figura illustra il flusso dei dati fra i
 componenti software che realizzano questo ciclo: la fotocamera virtuale
 fornisce l'immagine al motore di inferenza e, insieme al simulatore
 ambientale, i dati di contesto all'agente decisionale; il motore di
@@ -51,15 +51,13 @@ interagisce mai direttamente con gli attuatori.
 \draw[arrow] (agent) -- (log);
 \end{tikzpicture}
 }
-\caption{Schema a blocchi del flusso sense-think-act-log in PomodorIA. Il
+\caption*{Schema a blocchi del flusso sense-think-act-log in PomodorIA. Il
 motore di inferenza comunica solo con la fotocamera e con l'agente; è
 l'agente, e solo lui, a comandare gli attuatori e il logging.}
-\label{fig:diagramma-blocchi}
 \end{figure}
 
 \subsection{Mapping sui sette livelli IoTWF}
-
-La Tabella~\ref{tab:iotwf} mappa ogni livello del modello IoT World Forum
+Di seguito si può trovare la tabella che mappa ogni livello del modello IoT World Forum
 (Sezione~\ref{sec:iotwf}) sul relativo componente software del progetto.
 
 \begin{table}[h]
@@ -92,6 +90,6 @@ Notifiche all'agricoltore, integrazione gestionale &
 Notifiche e allarmi generati dall'agente e mostrati nell'interfaccia \\
 \bottomrule
 \end{tabular}
-\caption{Mapping dell'architettura di PomodorIA sui sette livelli IoTWF.}
+\caption*{Mapping dell'architettura di PomodorIA sui sette livelli IoTWF.}
 \label{tab:iotwf}
 \end{table}
