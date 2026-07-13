@@ -7,7 +7,7 @@ Il progetto ML originale (CNN---TOMATO-) ha addestrato la CNN con uno
 split Holdout 80/20 fatto così (dataset.py::get_train_test_split):
 
     train_size = int(0.8 * len(dataset))
-    test_size  = len(dataset) - train_size
+    test_size = len(dataset) - train_size
     train_data, test_data = random_split(
         dataset, [train_size, test_size],
         generator=torch.Generator().manual_seed(42)
@@ -42,8 +42,8 @@ Utilizzo:
         --mode symlink
 
     # poi in config.yaml:
-    #   paths:
-    #     dataset_root: "./plantvillage_testset"
+    # paths:
+    # dataset_root: "./plantvillage_testset"
 """
 
 import argparse
@@ -66,7 +66,7 @@ def find_tomato_folder(root: str) -> str:
         tomato_dirs = [d for d in dirnames if d.startswith("Tomato")]
         if len(tomato_dirs) >= 8:
             return dirpath
-    raise FileNotFoundError(f"❌ Nessuna cartella Tomato trovata sotto '{root}'")
+    raise FileNotFoundError(f"Nessuna cartella Tomato trovata sotto '{root}'")
 
 
 def build_filtered_dataset(data_dir: str):
@@ -81,7 +81,7 @@ def build_filtered_dataset(data_dir: str):
       - classes: nomi delle classi Tomato, nell'ordine usato dal training
     """
     data_dir_final = find_tomato_folder(data_dir)
-    print(f"[🔍] Cartella dataset trovata: {data_dir_final}")
+    print(f"Cartella dataset trovata: {data_dir_final}")
 
     full_dataset = datasets.ImageFolder(root=data_dir_final)
 
@@ -125,17 +125,16 @@ def extract_test_set(
 ) -> None:
     full_dataset, valid_indices, classes = build_filtered_dataset(dataset_root)
     n_filtered = len(valid_indices)
-    print(f"[📊] Immagini Tomato totali: {n_filtered} | classi: {len(classes)}")
+    print(f"Immagini Tomato totali: {n_filtered} | classi: {len(classes)}")
 
     test_idx_filtered, train_idx_filtered = get_test_indices(n_filtered, train_ratio, seed)
     print(
-        f"[✂️ ] Split riprodotto (seed={seed}, train_ratio={train_ratio:.0%}): "
+        f"Split riprodotto (seed={seed}, train_ratio={train_ratio:.0%}): "
         f"train={len(train_idx_filtered)} | test={len(test_idx_filtered)}"
     )
 
-    # Verifica di sicurezza: nessuna sovrapposizione train/test
     overlap = set(test_idx_filtered) & set(train_idx_filtered)
-    assert not overlap, f"❌ ERRORE: {len(overlap)} indici in comune tra train e test!"
+    assert not overlap, f"ERRORE: {len(overlap)} indici in comune tra train e test!"
 
     output_root = Path(output_dir)
     output_root.mkdir(parents=True, exist_ok=True)
@@ -181,9 +180,9 @@ def extract_test_set(
         writer.writeheader()
         writer.writerows(manifest_rows)
 
-    print(f"\n[✅] Test set estratto in '{output_root}' (mode={mode})")
-    print(f"[📄] Manifest salvato in '{manifest_path}'")
-    print("\n[📊] Immagini di test per classe:")
+    print(f"\nTest set estratto in '{output_root}' (mode={mode})")
+    print(f"Manifest salvato in '{manifest_path}'")
+    print("\nImmagini di test per classe:")
     for c, n in sorted(per_class_count.items()):
         print(f"   {c:<45} {n:>5}")
     print(f"   {'TOTALE':<45} {sum(per_class_count.values()):>5}")

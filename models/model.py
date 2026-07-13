@@ -14,7 +14,6 @@ class TomatoCNN(nn.Module):
         self.num_blocks = num_blocks
         padding = kernel_size // 2  # mantiene dimensione spaziale prima del pooling
 
-        # Costruzione dinamica dei blocchi conv+pool
         conv_blocks = []
         in_channels = 3
         out_channels = n_filters
@@ -41,5 +40,5 @@ class TomatoCNN(nn.Module):
 
     def forward(self, x):
         x = self.conv_net(x)
-        x = x.view(x.size(0), -1)  # Flatten
+        x = x.view(x.size(0), -1)
         return self.classifier(x)

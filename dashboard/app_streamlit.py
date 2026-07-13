@@ -31,16 +31,16 @@ from PIL import Image
 # Costanti
 # ══════════════════════════════════════════════════════════════
 CLASS_LABELS = {
-    "Tomato___Bacterial_spot":                       "Bacterial Spot",
-    "Tomato___Early_blight":                         "Early Blight",
-    "Tomato___Late_blight":                          "Late Blight",
-    "Tomato___Leaf_Mold":                            "Leaf Mold",
-    "Tomato___Septoria_leaf_spot":                   "Septoria",
+    "Tomato___Bacterial_spot": "Bacterial Spot",
+    "Tomato___Early_blight": "Early Blight",
+    "Tomato___Late_blight": "Late Blight",
+    "Tomato___Leaf_Mold": "Leaf Mold",
+    "Tomato___Septoria_leaf_spot": "Septoria",
     "Tomato___Spider_mites Two-spotted_spider_mite": "Spider Mites",
-    "Tomato___Target_Spot":                          "Target Spot",
-    "Tomato___Tomato_Yellow_Leaf_Curl_Virus":        "TYLCV",
-    "Tomato___Tomato_mosaic_virus":                  "Mosaic Virus",
-    "Tomato___healthy":                              "Healthy",
+    "Tomato___Target_Spot": "Target Spot",
+    "Tomato___Tomato_Yellow_Leaf_Curl_Virus": "TYLCV",
+    "Tomato___Tomato_mosaic_virus": "Mosaic Virus",
+    "Tomato___healthy": "Healthy",
 }
 CLASS_COLORS = {
     "Healthy": "#00d4aa", "Early Blight": "#fd9644", "Late Blight": "#e17055",
@@ -63,20 +63,20 @@ DARK_LAYOUT = dict(
     font=dict(color="#c9ccd1"),
 )
 MODE_LABELS = {
-    "full_precision":            "Full Precision (float32)",
-    "optimized_onnx":            "Optimized · ONNX INT8",
+    "full_precision": "Full Precision (float32)",
+    "optimized_onnx": "Optimized · ONNX INT8",
     "optimized_pruned_quantized": "Optimized · Pruned+Quant INT8",
-    "optimized_pruned":          "Optimized · Pruned (float32)",
+    "optimized_pruned": "Optimized · Pruned (float32)",
 }
 VARIANT_LABELS = {
-    "auto":             "Auto (priorità: ONNX > pruned+quant > pruned)",
-    "onnx":             "ONNX quantizzato (~stessa accuracy della baseline)",
+    "auto": "Auto (priorità: ONNX > pruned+quant > pruned)",
+    "onnx": "ONNX quantizzato (~stessa accuracy della baseline)",
     "pruned_quantized": "Pruned + Quantizzato INT8 (più compresso, accuracy più bassa)",
-    "pruned":           "Solo Pruned (float32)",
+    "pruned": "Solo Pruned (float32)",
 }
 BIAS_OPTIONS = ["— Random —"] + list(CLASS_LABELS.keys())
 
-st.set_page_config(page_title="PomodorIA · Serra Domotica", page_icon="🍅", layout="wide")
+st.set_page_config(page_title="PomodorIA · Serra Domotica", page_icon="", layout="wide")
 
 # Piccolo ritocco estetico: nasconde il chrome di Streamlit
 # (il tema scuro/colori vengono da .streamlit/config.toml).
@@ -92,25 +92,25 @@ st.markdown("""
 # parametro, così ogni icona si intona sempre con l'accento della card che
 # la contiene (a differenza delle emoji, che hanno un colore fisso).
 _ICONS = {
-    "settings":    "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
-    "gamepad":     "M6 12h4m-2-2v4m7-1h.01M17 9h.01M2 15V9a4 4 0 0 1 4-4h12a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4c-1 0-1.5-.5-2-1l-1-1H9l-1 1c-.5.5-1 1-2 1a4 4 0 0 1-4-4z",
-    "server":      "M2 2h20a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm0 12h20a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2zm4 2h.01M6 6h.01",
-    "microscope":  "M6 18h8M3 22h18M14 22a7 7 0 1 0 0-14h-1M9 14h2M9 12a2 2 0 0 1-2-2V6h6v4a2 2 0 0 1-2 2zm3-6V3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3",
-    "cloud":       "M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z",
-    "wrench":      "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z",
-    "cpu":         "M9 1v3m6-3v3M9 20v3m6-3v3M1 9h3m-3 6h3m20-6h-3m3 6h-3M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm5 5h6v6H9z",
-    "bar-chart":   "M18 20V10M12 20V4M6 20v-6",
-    "list":        "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01",
-    "refresh":     "M23 4v6h-6M1 20v-6h6m16.73-6A10 10 0 0 0 3.27 10.27M.27 16A10 10 0 0 0 20.73 13.73",
-    "target":      "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zm0-14a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4z",
-    "zap":         "M13 2 3 14h9l-1 8 10-12h-9z",
-    "alert-tri":   "M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4m0 4h.01",
+    "settings": "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
+    "gamepad": "M6 12h4m-2-2v4m7-1h.01M17 9h.01M2 15V9a4 4 0 0 1 4-4h12a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4c-1 0-1.5-.5-2-1l-1-1H9l-1 1c-.5.5-1 1-2 1a4 4 0 0 1-4-4z",
+    "server": "M2 2h20a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm0 12h20a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2zm4 2h.01M6 6h.01",
+    "microscope": "M6 18h8M3 22h18M14 22a7 7 0 1 0 0-14h-1M9 14h2M9 12a2 2 0 0 1-2-2V6h6v4a2 2 0 0 1-2 2zm3-6V3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3",
+    "cloud": "M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z",
+    "wrench": "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z",
+    "cpu": "M9 1v3m6-3v3M9 20v3m6-3v3M1 9h3m-3 6h3m20-6h-3m3 6h-3M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm5 5h6v6H9z",
+    "bar-chart": "M18 20V10M12 20V4M6 20v-6",
+    "list": "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01",
+    "refresh": "M23 4v6h-6M1 20v-6h6m16.73-6A10 10 0 0 0 3.27 10.27M.27 16A10 10 0 0 0 20.73 13.73",
+    "target": "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zm0-14a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4z",
+    "zap": "M13 2 3 14h9l-1 8 10-12h-9z",
+    "alert-tri": "M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4m0 4h.01",
     "thermometer": "M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z",
-    "droplet":     "M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z",
-    "sun":         "M12 7a5 5 0 1 0 0 10A5 5 0 0 0 12 7zm0-5v2m0 14v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M2 12h2m14 0h4M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42",
-    "leaf":        "M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10zm-9 1c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12",
-    "wind":        "M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2",
-    "database":    "M12 2c4.97 0 9 1.34 9 3v14c0 1.66-4.03 3-9 3S3 20.66 3 19V5c0-1.66 4.03-3 9-3zm9 5c0 1.66-4.03 3-9 3S3 12.66 3 12m18 4c0 1.66-4.03 3-9 3S3 16.66 3 16",
+    "droplet": "M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z",
+    "sun": "M12 7a5 5 0 1 0 0 10A5 5 0 0 0 12 7zm0-5v2m0 14v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M2 12h2m14 0h4M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42",
+    "leaf": "M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10zm-9 1c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12",
+    "wind": "M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2",
+    "database": "M12 2c4.97 0 9 1.34 9 3v14c0 1.66-4.03 3-9 3S3 20.66 3 19V5c0-1.66 4.03-3 9-3zm9 5c0 1.66-4.03 3-9 3S3 12.66 3 12m18 4c0 1.66-4.03 3-9 3S3 16.66 3 16",
 }
 
 
@@ -335,7 +335,7 @@ def benchmark_comparison_chart() -> Optional[go.Figure]:
 def render_sidebar(config: dict) -> tuple[float, int]:
     ss = st.session_state
     with st.sidebar:
-        st.title("🍅 PomodorIA")
+        st.title("PomodorIA")
         st.caption("Serra Domotica · Edge AI")
 
         section_header("settings", "Configurazione")
@@ -372,11 +372,11 @@ def render_sidebar(config: dict) -> tuple[float, int]:
                         init_components(config, mode, bias, variant)
                 ss.running, ss.interval, ss.max_cycles = True, interval, max_cycles
                 st.rerun()
-        elif st.button("⏸ Ferma", use_container_width=True):
+        elif st.button("Ferma", use_container_width=True):
             ss.running = False
             st.rerun()
 
-        if ss.get("init") and st.button("↺ Reset sessione", use_container_width=True):
+        if ss.get("init") and st.button("Reset sessione", use_container_width=True):
             ss.running, ss.cycles = False, []
             ss.actuators.deactivate_all("reset")
             st.rerun()

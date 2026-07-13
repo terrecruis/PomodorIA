@@ -12,14 +12,14 @@ Tecniche applicate in sequenza:
   3. Export ONNX → motore di inferenza più realistico per Raspberry Pi
 
 Output generati in models/optimized/:
-  - model_pruned.pth              (solo pruned, float32)
-  - model_pruned_quantized.pth    (pruned + quantizzato INT8, PyTorch)
-  - model_quantized.onnx          (ONNX Runtime, pronto per il deploy)
-  - benchmark_results.csv         (tabella §4.3 del README)
+  - model_pruned.pth (solo pruned, float32)
+  - model_pruned_quantized.pth (pruned + quantizzato INT8, PyTorch)
+  - model_quantized.onnx (ONNX Runtime, pronto per il deploy)
+  - benchmark_results.csv (tabella §4.3 del README)
 
 Utilizzo:
     python models/compress.py
-    python models/compress.py --sparsity 0.5   # pruning al 50%
+    python models/compress.py --sparsity 0.5 # pruning al 50%
 
 Il benchmark viene eseguito automaticamente al termine sul test set,
 misurando accuracy / dimensione / latenza per ogni variante.
@@ -74,7 +74,7 @@ def get_test_loader(config: dict, max_images: int = 500) -> DataLoader:
     Restituisce un DataLoader sul test set del dataset PlantVillage.
 
     Args:
-        config:     configurazione del progetto
+        config: configurazione del progetto
         max_images: numero massimo di immagini da caricare (per velocità)
 
     Returns:
@@ -116,17 +116,17 @@ def measure_pytorch_metrics(
     Misura accuracy, latenza media e uso RAM di un modello PyTorch.
 
     Args:
-        model:     modello da valutare (già in .eval())
-        loader:    DataLoader del test set
-        classes:   lista delle classi
-        n_warmup:  predizioni di warmup (non conteggiate nei tempi)
+        model: modello da valutare (già in .eval())
+        loader: DataLoader del test set
+        classes: lista delle classi
+        n_warmup: predizioni di warmup (non conteggiate nei tempi)
         n_measure: predizioni su cui mediare il tempo di inferenza
         quantized: se True, imposta qnnpack engine prima dell'inferenza
 
     Returns:
         dict con accuracy, avg_inference_ms, ram_mb, nonzero_params
     """
-    torch.set_num_threads(1)   # simula 1 core Raspberry Pi
+    torch.set_num_threads(1) # simula 1 core Raspberry Pi
     if quantized:
         # I modelli quantizzati con qnnpack richiedono che il backend
         # sia impostato anche al momento dell'inferenza
@@ -146,13 +146,11 @@ def measure_pytorch_metrics(
     accuracy = correct / total if total > 0 else 0.0
 
     # ── Latenza: immagine singola (simula inferenza 1-shot su Raspberry Pi) ──
-    # Warmup
     dummy = torch.randn(1, 3, 64, 64)
     with torch.no_grad():
         for _ in range(n_warmup):
             model(dummy)
 
-    # Misura su n_measure inferenze singole
     times = []
     with torch.no_grad():
         for _ in range(n_measure):
@@ -216,7 +214,7 @@ def load_baseline(config: dict) -> TomatoCNN:
     )
     model.load_state_dict(state_dict)
     model.eval()
-    print(f"✅ Baseline caricata da '{checkpoint_path}'")
+    print(f"Baseline caricata da '{checkpoint_path}'")
     return model
 
 
@@ -239,7 +237,7 @@ def apply_structured_pruning(
         - Non richiede formati sparsi per beneficiarne in latenza
 
     Args:
-        model:    modello PyTorch da comprimere (modifica in-place)
+        model: modello PyTorch da comprimere (modifica in-place)
         sparsity: frazione di filtri da azzerare per layer (0.0–1.0)
 
     Returns:
@@ -255,13 +253,13 @@ def apply_structured_pruning(
                 module,
                 name="weight",
                 amount=sparsity,
-                n=1,          # norma L1
-                dim=0,        # dimensione dei filtri (output channels)
+                n=1,
+                dim=0,
             )
             conv_layers_pruned += 1
 
     print(
-        f"✂️  Structured pruning applicato a {conv_layers_pruned} layer Conv2d "
+        f"Structured pruning applicato a {conv_layers_pruned} layer Conv2d "
         f"| sparsity target: {sparsity:.0%}"
     )
     return model_pruned
@@ -282,7 +280,7 @@ def make_pruning_permanent(model: nn.Module) -> nn.Module:
         if isinstance(module, nn.Conv2d) and prune.is_pruned(module):
             prune.remove(module, "weight")
 
-    print("✅ Pruning reso permanente (maschere rimosse)")
+    print("Pruning reso permanente (maschere rimosse)")
     return model
 
 
@@ -312,16 +310,16 @@ def apply_dynamic_quantization(model: nn.Module) -> nn.Module:
     model_copy = copy.deepcopy(model)
     model_copy.eval()
 
-    print("🔢 Dynamic Quantization (pesi INT8, attivazioni float32 a runtime)...")
+    print("Dynamic Quantization (pesi INT8, attivazioni float32 a runtime)...")
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore")   # sopprime DeprecationWarning torch.ao
+        warnings.simplefilter("ignore") # sopprime DeprecationWarning torch.ao
         model_quantized = torch.quantization.quantize_dynamic(
             model_copy,
-            qconfig_spec={nn.Linear, nn.Conv2d},   # quantizza sia Conv2d che Linear
+            qconfig_spec={nn.Linear, nn.Conv2d}, # quantizza sia Conv2d che Linear
             dtype=torch.qint8,
         )
 
-    print("✅ Dynamic Quantization completata | pesi float32 → INT8")
+    print("Dynamic Quantization completata | pesi float32 → INT8")
     return model_quantized
 
 
@@ -342,21 +340,21 @@ def export_to_onnx(
     per un Raspberry Pi reale.
 
     Args:
-        model:       modello PyTorch da esportare
+        model: modello PyTorch da esportare
         output_path: percorso del file .onnx di output
-        input_size:  shape del tensor di input (batch=1, C=3, H=64, W=64)
+        input_size: shape del tensor di input (batch=1, C=3, H=64, W=64)
     """
     model.eval()
     dummy_input = torch.randn(*input_size)
 
-    print(f"📤 Export ONNX → '{output_path}'...")
+    print(f"Export ONNX → '{output_path}'...")
     torch.onnx.export(
         model,
         dummy_input,
         output_path,
-        export_params=True,            # include i pesi nel file .onnx
-        opset_version=17,              # versione ONNX opset
-        do_constant_folding=True,      # ottimizzazione: piega le costanti
+        export_params=True,
+        opset_version=17,
+        do_constant_folding=True,
         input_names=["input"],
         output_names=["output"],
         dynamic_axes={
@@ -375,7 +373,7 @@ def export_to_onnx(
     )
 
     size_mb = measure_file_size_mb(output_path)
-    print(f"✅ ONNX esportato | dimensione: {size_mb:.2f} MB")
+    print(f"ONNX esportato | dimensione: {size_mb:.2f} MB")
 
 
 def quantize_onnx(onnx_path: str, output_path: str) -> None:
@@ -383,18 +381,18 @@ def quantize_onnx(onnx_path: str, output_path: str) -> None:
     Quantizza un modello ONNX da float32 a INT8 usando onnxruntime.
 
     Args:
-        onnx_path:   percorso del file .onnx float32 in input
+        onnx_path: percorso del file .onnx float32 in input
         output_path: percorso del file .onnx INT8 di output
     """
     try:
         from onnxruntime.quantization import quantize_dynamic, QuantType
     except ImportError:
-        print("⚠️  onnxruntime.quantization non disponibile. Salto quantizzazione ONNX.")
+        print(" onnxruntime.quantization non disponibile. Salto quantizzazione ONNX.")
         import shutil
         shutil.copy(onnx_path, output_path)
         return
 
-    print(f"🔢 Quantizzazione ONNX (dynamic INT8) → '{output_path}'...")
+    print(f"Quantizzazione ONNX (dynamic INT8) → '{output_path}'...")
     try:
         quantize_dynamic(
             model_input=onnx_path,
@@ -403,10 +401,10 @@ def quantize_onnx(onnx_path: str, output_path: str) -> None:
             per_channel=False,
         )
         size_mb = measure_file_size_mb(output_path)
-        print(f"✅ ONNX quantizzato | dimensione: {size_mb:.2f} MB")
+        print(f"ONNX quantizzato | dimensione: {size_mb:.2f} MB")
     except Exception as e:
         # Fallback: copia il modello base senza quantizzazione ONNX
-        print(f"⚠️  Quantizzazione ONNX non riuscita ({e}). ")
+        print(f"Quantizzazione ONNX non riuscita ({e}). ")
         print("   Uso model_base.onnx float32 come model_quantized.onnx (benchmark ONNX è comunque valido).")
         import shutil
         shutil.copy(onnx_path, output_path)
@@ -427,9 +425,9 @@ def measure_onnx_metrics(
 
     Args:
         onnx_path: percorso del file .onnx
-        loader:    DataLoader del test set
-        classes:   lista delle classi
-        n_warmup:  predizioni di warmup
+        loader: DataLoader del test set
+        classes: lista delle classi
+        n_warmup: predizioni di warmup
         n_measure: predizioni su cui mediare il tempo
 
     Returns:
@@ -439,7 +437,7 @@ def measure_onnx_metrics(
         import onnxruntime as ort
         import numpy as np
     except ImportError:
-        print("⚠️  onnxruntime non installato. Salto benchmark ONNX.")
+        print(" onnxruntime non installato. Salto benchmark ONNX.")
         return {}
 
     session = ort.InferenceSession(onnx_path, providers=["CPUExecutionProvider"])
@@ -494,7 +492,7 @@ def save_benchmark_csv(results: list, output_path: str) -> None:
         | Variante | Accuracy | Size (MB) | Latenza (ms) | Params non-zero |
 
     Args:
-        results:     lista di dict con i risultati per ogni variante
+        results: lista di dict con i risultati per ogni variante
         output_path: percorso del file CSV di output
     """
     if not results:
@@ -518,7 +516,7 @@ def save_benchmark_csv(results: list, output_path: str) -> None:
         for row in results:
             writer.writerow(row)
 
-    print(f"\n📊 Tabella benchmark salvata in '{output_path}'")
+    print(f"\nTabella benchmark salvata in '{output_path}'")
 
 
 def print_benchmark_table(results: list) -> None:
@@ -557,14 +555,14 @@ def run_compression_pipeline(
             ├─── Benchmark baseline
             │
             ├─── Structured Pruning (sparsity%)
-            │         │
-            │         ├─── Salva model_pruned.pth
-            │         └─── Benchmark pruned
+            │ │
+            │ ├─── Salva model_pruned.pth
+            │ └─── Benchmark pruned
             │
             ├─── Quantizzazione dinamica INT8
-            │         │
-            │         ├─── Salva model_pruned_quantized.pth
-            │         └─── Benchmark pruned+quantized
+            │ │
+            │ ├─── Salva model_pruned_quantized.pth
+            │ └─── Benchmark pruned+quantized
             │
             └─── Export ONNX → Quantizzazione ONNX
                       │
@@ -576,7 +574,7 @@ def run_compression_pipeline(
         sparsity: frazione di filtri da potare (0.0–1.0)
     """
     print("\n" + "═" * 60)
-    print("  PomodorIA — Pipeline Compressione Modello (Fase 4)")
+    print("PomodorIA — Pipeline Compressione Modello (Fase 4)")
     print("═" * 60)
 
     # ── Setup ────────────────────────────────────────────────
@@ -587,12 +585,12 @@ def run_compression_pipeline(
     classes = config["model"]["classes"]
 
     # ── Dataset per il benchmark ─────────────────────────────
-    print("\n📂 Caricamento dataset per benchmark...")
+    print("\nCaricamento dataset per benchmark...")
     try:
         loader = get_test_loader(config, max_images=500)
-        print(f"   ✓ Dataset caricato")
+        print(f"   Dataset caricato")
     except Exception as e:
-        print(f"⚠️  Dataset non disponibile ({e}). "
+        print(f"Dataset non disponibile ({e}). "
               "Il benchmark sarà saltato, ma la compressione procede.")
         loader = None
 
@@ -609,7 +607,7 @@ def run_compression_pipeline(
     baseline_path = config["paths"]["checkpoint"]
 
     if loader is not None:
-        print("📏 Misurazione baseline...")
+        print("Misurazione baseline...")
         metrics = measure_pytorch_metrics(baseline, loader, classes)
         benchmark_results.append({
             "variant": "Baseline (float32)",
@@ -635,13 +633,12 @@ def run_compression_pipeline(
     model_pruned = apply_structured_pruning(baseline, sparsity=sparsity)
     model_pruned = make_pruning_permanent(model_pruned)
 
-    # Salva modello pruned
     pruned_path = os.path.join(optimized_dir, "model_pruned.pth")
     torch.save(model_pruned.state_dict(), pruned_path)
-    print(f"💾 Salvato: '{pruned_path}' ({measure_file_size_mb(pruned_path):.2f} MB)")
+    print(f"Salvato: '{pruned_path}' ({measure_file_size_mb(pruned_path):.2f} MB)")
 
     if loader is not None:
-        print("📏 Misurazione modello pruned...")
+        print("Misurazione modello pruned...")
         metrics = measure_pytorch_metrics(model_pruned, loader, classes)
         benchmark_results.append({
             "variant": f"Pruned (sparsity={sparsity:.0%})",
@@ -666,18 +663,17 @@ def run_compression_pipeline(
 
     model_quantized = apply_dynamic_quantization(model_pruned)
 
-    # Salva modello pruned + quantizzato
     # NOTA: i modelli quantizzati PyTorch vanno serializzati con torch.save(model, ...)
     # non solo il state_dict, perché la struttura interna cambia (QLinear, QConv2d, ecc.)
     pruned_quantized_path = os.path.join(optimized_dir, "model_pruned_quantized.pth")
     torch.save(model_quantized, pruned_quantized_path)
     print(
-        f"💾 Salvato: '{pruned_quantized_path}' "
+        f"Salvato: '{pruned_quantized_path}' "
         f"({measure_file_size_mb(pruned_quantized_path):.2f} MB)"
     )
 
     if loader is not None:
-        print("📏 Misurazione modello pruned+quantizzato...")
+        print("Misurazione modello pruned+quantizzato...")
         try:
             metrics = measure_pytorch_metrics(
                 model_quantized, loader, classes, quantized=True
@@ -696,7 +692,7 @@ def run_compression_pipeline(
                   f"Latenza: {metrics['avg_inference_ms']:.1f}ms | "
                   f"Size: {measure_file_size_mb(pruned_quantized_path):.2f}MB")
         except Exception as e:
-            print(f"⚠️  Errore benchmark pruned+quantized: {e}")
+            print(f"Errore benchmark pruned+quantized: {e}")
 
     # ════════════════════════════════════════════════════════
     # STEP 4: Export ONNX
@@ -712,15 +708,14 @@ def run_compression_pipeline(
     onnx_quantized_path = os.path.join(optimized_dir, "model_quantized.onnx")
 
     try:
-        # Usa baseline per l'export ONNX
         export_to_onnx(baseline, onnx_base_path)
         quantize_onnx(onnx_base_path, onnx_quantized_path)
     except Exception as e:
-        print(f"⚠️  Export ONNX fallito: {e}")
+        print(f"Export ONNX fallito: {e}")
         print("   Possibile causa: opset non supportato o modello con layer non esportabili.")
 
     if loader is not None and os.path.exists(onnx_quantized_path):
-        print("📏 Misurazione modello ONNX quantizzato...")
+        print("Misurazione modello ONNX quantizzato...")
         try:
             metrics_onnx = measure_onnx_metrics(onnx_quantized_path, loader, classes)
             if metrics_onnx:
@@ -735,7 +730,7 @@ def run_compression_pipeline(
                     "ram_mb": metrics_onnx.get("ram_mb", "N/A"),
                 })
         except Exception as e:
-            print(f"⚠️  Benchmark ONNX fallito: {e}")
+            print(f"Benchmark ONNX fallito: {e}")
 
     # ════════════════════════════════════════════════════════
     # Salvataggio risultati
@@ -746,13 +741,13 @@ def run_compression_pipeline(
         print_benchmark_table(benchmark_results)
 
     print("\n" + "═" * 60)
-    print("  Pipeline completata! File generati in models/optimized/")
+    print("Pipeline completata! File generati in models/optimized/")
     print("═" * 60)
-    print(f"  • model_pruned.pth")
-    print(f"  • model_pruned_quantized.pth")
-    print(f"  • model_base.onnx")
-    print(f"  • model_quantized.onnx")
-    print(f"  • benchmarks/benchmark_results.csv")
+    print(f"• model_pruned.pth")
+    print(f"• model_pruned_quantized.pth")
+    print(f"• model_base.onnx")
+    print(f"• model_quantized.onnx")
+    print(f"• benchmarks/benchmark_results.csv")
     print("═" * 60 + "\n")
 
 

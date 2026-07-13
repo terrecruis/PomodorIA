@@ -33,11 +33,11 @@ from torchvision import transforms
 @dataclass
 class CameraCapture:
     """Risultato di una cattura della fotocamera virtuale."""
-    timestamp: float                # epoch time dello scatto
-    image_tensor: torch.Tensor      # tensor preprocessato (1, 3, 64, 64)
-    image_path: str                 # path completo dell'immagine originale
-    true_label: str                 # classe reale (ground truth dal dataset)
-    true_label_idx: int             # indice numerico della classe
+    timestamp: float # epoch time dello scatto
+    image_tensor: torch.Tensor # tensor preprocessato (1, 3, 64, 64)
+    image_path: str # path completo dell'immagine originale
+    true_label: str # classe reale (ground truth dal dataset)
+    true_label_idx: int # indice numerico della classe
 
 
 # ══════════════════════════════════════════════════════════════
@@ -80,10 +80,9 @@ class VirtualCameraSensor:
 
         # Costruisce l'indice: {classe: [lista_path_immagini]}
         self._image_index: Dict[str, List[str]] = {}
-        self._all_images: List[tuple] = []  # (path, classe, idx_classe)
+        self._all_images: List[tuple] = [] # (path, classe, idx_classe)
         self._build_index()
 
-        # Contatori per statistiche
         self.total_captures = 0
 
     def _build_index(self) -> None:
@@ -97,7 +96,7 @@ class VirtualCameraSensor:
             class_dir = os.path.join(self.dataset_root, class_name)
 
             if not os.path.isdir(class_dir):
-                print(f"⚠️  Cartella non trovata per classe '{class_name}': {class_dir}")
+                print(f"Cartella non trovata per classe '{class_name}': {class_dir}")
                 self._image_index[class_name] = []
                 continue
 
@@ -106,19 +105,19 @@ class VirtualCameraSensor:
                 for f in os.listdir(class_dir)
                 if os.path.splitext(f)[1].lower() in valid_extensions
             ]
-            images.sort()  # ordinamento deterministico
+            images.sort() # ordinamento deterministico
             self._image_index[class_name] = images
 
             for img_path in images:
                 self._all_images.append((img_path, class_name, class_idx))
 
         total = sum(len(v) for v in self._image_index.values())
-        print(f"📷 VirtualCamera inizializzata: {total:,} immagini, "
+        print(f"VirtualCamera inizializzata: {total:,} immagini, "
               f"{len(self.classes)} classi")
 
         if self.bias_class:
             n_bias = len(self._image_index.get(self.bias_class, []))
-            print(f"   ↳ Bias attivo verso '{self.bias_class}' ({n_bias} immagini)")
+            print(f"   Bias attivo verso '{self.bias_class}' ({n_bias} immagini)")
 
     def capture(self) -> CameraCapture:
         """
@@ -131,7 +130,6 @@ class VirtualCameraSensor:
             CameraCapture con immagine preprocessata e metadati
         """
         if self.bias_class and random.random() < 0.5:
-            # Pesca dalla classe con bias
             images = self._image_index.get(self.bias_class, [])
             if images:
                 img_path = random.choice(images)
@@ -141,12 +139,10 @@ class VirtualCameraSensor:
                 # Fallback a selezione casuale se la classe non esiste
                 img_path, true_label, true_label_idx = random.choice(self._all_images)
         else:
-            # Selezione uniformemente casuale tra tutte le immagini
             img_path, true_label, true_label_idx = random.choice(self._all_images)
 
-        # Carica e preprocessa l'immagine
         image = Image.open(img_path).convert("RGB")
-        image_tensor = self.transform(image).unsqueeze(0)  # (1, 3, 64, 64)
+        image_tensor = self.transform(image).unsqueeze(0) # (1, 3, 64, 64)
 
         self.total_captures += 1
 

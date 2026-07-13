@@ -2,10 +2,10 @@
 sensors/environment_simulator.py — Environmental Sensor Simulator (IoTWF Livello 1)
 
 Simula i sensori ambientali della serra:
-- Temperatura (°C)          → come un DHT22
-- Umidità relativa (%)      → come un DHT22
-- Umidità del suolo (%)     → come un igrometro capacitivo
-- Luminosità (lux)          → come un BH1750
+- Temperatura (°C) → come un DHT22
+- Umidità relativa (%) → come un DHT22
+- Umidità del suolo (%) → come un igrometro capacitivo
+- Luminosità (lux) → come un BH1750
 
 I valori NON sono puramente casuali: sono **correlati euristicamente
 alla patologia rilevata dalla fotocamera**, implementando il concetto
@@ -33,11 +33,11 @@ import numpy as np
 @dataclass
 class EnvironmentReading:
     """Lettura dei sensori ambientali simulati."""
-    timestamp: float            # epoch time della lettura
-    temperature_c: float        # temperatura in °C
-    humidity_pct: float         # umidità relativa in %
-    soil_moisture_pct: float    # umidità del suolo in %
-    light_lux: float            # luminosità in lux
+    timestamp: float # epoch time della lettura
+    temperature_c: float # temperatura in °C
+    humidity_pct: float # umidità relativa in %
+    soil_moisture_pct: float # umidità del suolo in %
+    light_lux: float # luminosità in lux
 
     def to_dict(self) -> dict:
         """Converte la lettura in dizionario (per logging/CSV)."""
@@ -62,7 +62,7 @@ class SensorReading:
     """
     timestamp: float
     image_path: str
-    true_label: str             # ground truth dal dataset (per validazione PoC)
+    true_label: str # ground truth dal dataset (per validazione PoC)
     true_label_idx: int
     temperature_c: float
     humidity_pct: float
@@ -92,31 +92,31 @@ class SensorReading:
 _DISEASE_PROFILES: Dict[str, Dict[str, Tuple[float, float]]] = {
     # ── Malattie fungine: umidità alta, temperature moderate ──
     "Tomato___Bacterial_spot": {
-        "temperature_c": (27.0, 2.0),       # warm, humid
+        "temperature_c": (27.0, 2.0), # warm, humid
         "humidity_pct": (82.0, 5.0),
         "soil_moisture_pct": (65.0, 8.0),
         "light_lux": (15000.0, 5000.0),
     },
     "Tomato___Early_blight": {
-        "temperature_c": (25.0, 2.5),       # moderate temp, alta umidità
+        "temperature_c": (25.0, 2.5), # moderate temp, alta umidità
         "humidity_pct": (85.0, 4.0),
         "soil_moisture_pct": (60.0, 10.0),
         "light_lux": (12000.0, 4000.0),
     },
     "Tomato___Late_blight": {
-        "temperature_c": (20.0, 3.0),       # più fresco del Early
-        "humidity_pct": (90.0, 3.0),         # umidità molto alta
+        "temperature_c": (20.0, 3.0), # più fresco del Early
+        "humidity_pct": (90.0, 3.0), # umidità molto alta
         "soil_moisture_pct": (70.0, 8.0),
-        "light_lux": (8000.0, 3000.0),       # scarsa luce
+        "light_lux": (8000.0, 3000.0), # scarsa luce
     },
     "Tomato___Leaf_Mold": {
-        "temperature_c": (24.0, 2.0),       # warm, very humid
+        "temperature_c": (24.0, 2.0), # warm, very humid
         "humidity_pct": (88.0, 4.0),
         "soil_moisture_pct": (68.0, 7.0),
         "light_lux": (10000.0, 4000.0),
     },
     "Tomato___Septoria_leaf_spot": {
-        "temperature_c": (25.0, 2.0),       # warm, wet
+        "temperature_c": (25.0, 2.0), # warm, wet
         "humidity_pct": (84.0, 5.0),
         "soil_moisture_pct": (72.0, 6.0),
         "light_lux": (14000.0, 5000.0),
@@ -124,13 +124,13 @@ _DISEASE_PROFILES: Dict[str, Dict[str, Tuple[float, float]]] = {
 
     # ── Acari: ambiente secco e caldo ──
     "Tomato___Spider_mites Two-spotted_spider_mite": {
-        "temperature_c": (32.0, 2.0),       # caldo
-        "humidity_pct": (35.0, 5.0),         # secco
-        "soil_moisture_pct": (25.0, 8.0),    # terreno secco
-        "light_lux": (40000.0, 8000.0),      # alta esposizione
+        "temperature_c": (32.0, 2.0), # caldo
+        "humidity_pct": (35.0, 5.0), # secco
+        "soil_moisture_pct": (25.0, 8.0), # terreno secco
+        "light_lux": (40000.0, 8000.0), # alta esposizione
     },
     "Tomato___Target_Spot": {
-        "temperature_c": (26.0, 2.5),       # warm, humid
+        "temperature_c": (26.0, 2.5), # warm, humid
         "humidity_pct": (80.0, 6.0),
         "soil_moisture_pct": (62.0, 8.0),
         "light_lux": (18000.0, 6000.0),
@@ -138,13 +138,13 @@ _DISEASE_PROFILES: Dict[str, Dict[str, Tuple[float, float]]] = {
 
     # ── Malattie virali: temperature varie, vettori insetti ──
     "Tomato___Tomato_Yellow_Leaf_Curl_Virus": {
-        "temperature_c": (30.0, 3.0),       # caldo (favorisce mosche bianche)
+        "temperature_c": (30.0, 3.0), # caldo (favorisce mosche bianche)
         "humidity_pct": (55.0, 10.0),
         "soil_moisture_pct": (45.0, 10.0),
         "light_lux": (35000.0, 8000.0),
     },
     "Tomato___Tomato_mosaic_virus": {
-        "temperature_c": (26.0, 4.0),       # varie (trasmissione meccanica)
+        "temperature_c": (26.0, 4.0), # varie (trasmissione meccanica)
         "humidity_pct": (60.0, 12.0),
         "soil_moisture_pct": (50.0, 12.0),
         "light_lux": (25000.0, 8000.0),
@@ -152,10 +152,10 @@ _DISEASE_PROFILES: Dict[str, Dict[str, Tuple[float, float]]] = {
 
     # ── Pianta sana: condizioni ottimali ──
     "Tomato___healthy": {
-        "temperature_c": (24.0, 2.0),       # temperatura ideale
-        "humidity_pct": (65.0, 5.0),         # umidità moderata
-        "soil_moisture_pct": (55.0, 5.0),    # suolo ben irrigato
-        "light_lux": (30000.0, 5000.0),      # buona illuminazione
+        "temperature_c": (24.0, 2.0), # temperatura ideale
+        "humidity_pct": (65.0, 5.0), # umidità moderata
+        "soil_moisture_pct": (55.0, 5.0), # suolo ben irrigato
+        "light_lux": (30000.0, 5000.0), # buona illuminazione
     },
 }
 
@@ -195,10 +195,9 @@ class EnvironmentSensorSimulator:
             "light_lux": (0.0, 100000.0),
         }
 
-        # Contatore letture
         self.total_readings = 0
 
-        print("🌡️  EnvironmentSensorSimulator inizializzato")
+        print("EnvironmentSensorSimulator inizializzato")
 
     def read(self, disease_label: Optional[str] = None) -> EnvironmentReading:
         """
@@ -232,7 +231,6 @@ class EnvironmentSensorSimulator:
 
         values = {}
         for sensor_name, (mean, std) in profile.items():
-            # Genera valore con distribuzione gaussiana centrata sul profilo
             value = np.random.normal(mean, std)
             # Clamp nei range fisicamente possibili
             lo, hi = self._clamp_ranges[sensor_name]

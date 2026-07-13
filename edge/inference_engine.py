@@ -7,8 +7,8 @@ motore di inferenza su Raspberry Pi: singolo core CPU, no GPU, misura
 RAM e latenza ad ogni predizione.
 
 Supporta due modalità (config.yaml → model.mode):
-  - "full_precision"  → modello originale float32 (.pth baseline)
-  - "optimized"       → modello compresso prodotto da models/compress.py
+  - "full_precision" → modello originale float32 (.pth baseline)
+  - "optimized" → modello compresso prodotto da models/compress.py
                         (PyTorch quantizzato oppure ONNX Runtime)
 
 Flusso:
@@ -16,9 +16,9 @@ Flusso:
            │
            ▼
     [InferenceEngine.predict()]
-           │  torch.no_grad()
-           │  softmax(logits) → argmax → label
-           │  misura tempo + RAM
+           │ torch.no_grad()
+           │ softmax(logits) → argmax → label
+           │ misura tempo + RAM
            ▼
     InferenceResult
 """
@@ -57,13 +57,13 @@ class InferenceResult:
     Risultato di una singola inferenza della CNN.
 
     Campi:
-        predicted_label     : nome della classe predetta (es. "Tomato___Early_blight")
-        predicted_idx       : indice numerico della classe predetta (0–9)
-        confidence          : probabilità softmax della classe predetta (0.0–1.0)
-        all_probabilities   : vettore softmax completo (10 valori), utile per log/debug
-        inference_time_ms   : tempo totale di inferenza in millisecondi
-        ram_used_mb         : RAM del processo in quel momento (MB) — proxy Raspberry Pi
-        model_mode          : modalità del modello ("full_precision" o "optimized")
+        predicted_label : nome della classe predetta (es. "Tomato___Early_blight")
+        predicted_idx : indice numerico della classe predetta (0–9)
+        confidence : probabilità softmax della classe predetta (0.0–1.0)
+        all_probabilities : vettore softmax completo (10 valori), utile per log/debug
+        inference_time_ms : tempo totale di inferenza in millisecondi
+        ram_used_mb : RAM del processo in quel momento (MB) — proxy Raspberry Pi
+        model_mode : modalità del modello ("full_precision" o "optimized")
     """
     predicted_label: str
     predicted_idx: int
@@ -82,7 +82,7 @@ class InferenceResult:
         return self.confidence < threshold
 
     def __str__(self) -> str:
-        status = "🌿 SANA" if self.is_healthy() else f"⚠️  MALATTIA"
+        status = " SANA" if self.is_healthy() else f"MALATTIA"
         return (
             f"{status} | {self.predicted_label} "
             f"(conf: {self.confidence:.1%}, "
@@ -105,11 +105,11 @@ class InferenceEngine:
 
     Modalità supportate:
         - "full_precision" : PyTorch float32, modello .pth originale
-        - "optimized"      : PyTorch INT8 (quantizzato) o ONNX Runtime
+        - "optimized" : PyTorch INT8 (quantizzato) o ONNX Runtime
 
     Simulazione Raspberry Pi:
-        - torch.set_num_threads(1)  → 1 solo core CPU
-        - device = "cpu"            → no GPU/MPS
+        - torch.set_num_threads(1) → 1 solo core CPU
+        - device = "cpu" → no GPU/MPS
         - psutil.Process().memory_info().rss → misura RAM
     """
 
@@ -129,19 +129,19 @@ class InferenceEngine:
         # ── Simulazione Raspberry Pi: limita a 1 thread ──────────
         num_threads = config["edge_simulation"].get("num_threads", 1)
         torch.set_num_threads(num_threads)
-        print(f"🔧 Edge simulation: {num_threads} thread(s) CPU, device={self.device}")
+        print(f"Edge simulation: {num_threads} thread(s) CPU, device={self.device}")
 
         # ── Caricamento modello ──────────────────────────────────
         self._model_pytorch: Optional[torch.nn.Module] = None
-        self._onnx_session = None  # onnxruntime.InferenceSession, se usato
-        self.loaded_variant: str = "full_precision"  # etichetta descrittiva del file caricato
+        self._onnx_session = None # onnxruntime.InferenceSession, se usato
+        self.loaded_variant: str = "full_precision" # etichetta descrittiva del file caricato
 
         self._load_model()
 
         # ── psutil: handle al processo corrente ──────────────────
         self._process = psutil.Process()
 
-        print(f"✅ InferenceEngine pronto | modalità: {self.mode}")
+        print(f"InferenceEngine pronto | modalità: {self.mode}")
 
     # ─────────────────────────────────────────────────────────────
     # Caricamento modello
@@ -152,7 +152,7 @@ class InferenceEngine:
         Carica il modello in base alla modalità configurata.
 
         full_precision: carica il checkpoint .pth originale (float32)
-        optimized:      carica la variante scelta da `model.optimized_variant`
+        optimized: carica la variante scelta da `model.optimized_variant`
                         (config.yaml), oppure la cerca in cascata se
                         variant == "auto":
                             ONNX quantizzato > PyTorch pruned+quantizzato >
@@ -169,9 +169,9 @@ class InferenceEngine:
             optimized_dir = self.config["paths"]["optimized_dir"]
 
             variants = {
-                "onnx":              ("onnx", os.path.join(optimized_dir, "model_quantized.onnx")),
-                "pruned_quantized":  ("pth_quantized", os.path.join(optimized_dir, "model_pruned_quantized.pth")),
-                "pruned":            ("pth", os.path.join(optimized_dir, "model_pruned.pth")),
+                "onnx": ("onnx", os.path.join(optimized_dir, "model_quantized.onnx")),
+                "pruned_quantized": ("pth_quantized", os.path.join(optimized_dir, "model_pruned_quantized.pth")),
+                "pruned": ("pth", os.path.join(optimized_dir, "model_pruned.pth")),
             }
 
             if self.optimized_variant != "auto":
@@ -184,7 +184,7 @@ class InferenceEngine:
                 kind, path = variants[self.optimized_variant]
                 if not os.path.exists(path):
                     print(
-                        f"⚠️  Variante '{self.optimized_variant}' richiesta ma file "
+                        f"Variante '{self.optimized_variant}' richiesta ma file "
                         f"'{path}' non trovato. Fallback a full_precision. "
                         "(hai eseguito 'python models/compress.py'?)"
                     )
@@ -222,7 +222,7 @@ class InferenceEngine:
                 self.loaded_variant = "optimized_pruned"
             else:
                 print(
-                    "⚠️  Nessun modello ottimizzato trovato in "
+                    " Nessun modello ottimizzato trovato in "
                     f"'{optimized_dir}'. Fallback a full_precision."
                 )
                 self.mode = "full_precision"
@@ -252,7 +252,7 @@ class InferenceEngine:
         """
         cfg_model = self.config["model"]
 
-        print(f"📦 Caricamento modello PyTorch da '{checkpoint_path}'...")
+        print(f"Caricamento modello PyTorch da '{checkpoint_path}'...")
 
         if quantized:
             # Un modello quantizzato viene serializzato/deserializzato
@@ -260,7 +260,7 @@ class InferenceEngine:
             self._model_pytorch = torch.load(
                 checkpoint_path,
                 map_location=self.device,
-                weights_only=False   # necessario per modelli quantizzati
+                weights_only=False # necessario per modelli quantizzati
             )
         else:
             # Ricostruisce l'architettura e carica i pesi (state_dict)
@@ -283,7 +283,7 @@ class InferenceEngine:
         self._model_pytorch.to(self.device)
 
         size_mb = os.path.getsize(checkpoint_path) / (1024 ** 2)
-        print(f"   ✓ Modello caricato | dimensione file: {size_mb:.2f} MB")
+        print(f"   Modello caricato | dimensione file: {size_mb:.2f} MB")
 
     def _load_onnx_model(self, onnx_path: str) -> None:
         """
@@ -300,7 +300,7 @@ class InferenceEngine:
                 "Esegui: pip install onnxruntime"
             )
 
-        print(f"📦 Caricamento modello ONNX da '{onnx_path}'...")
+        print(f"Caricamento modello ONNX da '{onnx_path}'...")
 
         # Usa solo CPU provider (no GPU, simula Raspberry Pi)
         self._onnx_session = ort.InferenceSession(
@@ -309,7 +309,7 @@ class InferenceEngine:
         )
 
         size_mb = os.path.getsize(onnx_path) / (1024 ** 2)
-        print(f"   ✓ Modello ONNX caricato | dimensione file: {size_mb:.2f} MB")
+        print(f"   Modello ONNX caricato | dimensione file: {size_mb:.2f} MB")
 
     # ─────────────────────────────────────────────────────────────
     # Inferenza principale
@@ -343,22 +343,20 @@ class InferenceEngine:
         """
         tensor = image_tensor.to(self.device)
 
-        # Misura RAM prima dell'inferenza
         ram_before_mb = self._process.memory_info().rss / (1024 ** 2)
 
         # ── Inferenza ────────────────────────────────────────────
         t_start = time.perf_counter()
         with torch.no_grad():
-            logits = self._model_pytorch(tensor)          # shape: (1, 10)
-            probabilities = F.softmax(logits, dim=1)      # converte in probabilità
+            logits = self._model_pytorch(tensor) # shape: (1, 10)
+            probabilities = F.softmax(logits, dim=1)
         t_end = time.perf_counter()
         # ─────────────────────────────────────────────────────────
 
         inference_ms = (t_end - t_start) * 1000.0
         ram_after_mb = self._process.memory_info().rss / (1024 ** 2)
 
-        # Estrae classe predetta
-        probs_list = probabilities.squeeze(0).tolist()   # (10,) → lista Python
+        probs_list = probabilities.squeeze(0).tolist() # (10,) → lista Python
         predicted_idx = int(probabilities.argmax(dim=1).item())
         confidence = probs_list[predicted_idx]
         predicted_label = self.classes[predicted_idx]
@@ -381,7 +379,6 @@ class InferenceEngine:
         """
         import numpy as np
 
-        # Converti tensor → numpy float32
         np_input = image_tensor.numpy().astype(np.float32)
 
         # Nome dell'input del modello ONNX (di solito "input" o "input.1")

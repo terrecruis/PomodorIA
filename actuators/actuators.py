@@ -9,9 +9,9 @@ reale: basta sostituire `from actuators.fake_gpio import ...` con
 `import RPi.GPIO as GPIO` senza modificare la logica degli attuatori.
 
 Attuatori simulati:
-    IrrigationActuator  — pompa dell'acqua (GPIO pin 17)
+    IrrigationActuator — pompa dell'acqua (GPIO pin 17)
     VentilationActuator — ventola di areazione (GPIO pin 27)
-    AlarmActuator       — LED/buzzer di allarme (GPIO pin 22)
+    AlarmActuator — LED/buzzer di allarme (GPIO pin 22)
     NotificationActuator — log testuale notifica all'agricoltore
 
 ActionResult: dataclass restituita da ogni activate(), contiene
@@ -34,9 +34,9 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ActionResult:
     """Descrive l'azione eseguita da un attuatore in un ciclo."""
-    actuator_name: str          # es. "IrrigationActuator"
-    action: str                 # "activate" | "deactivate" | "none"
-    reason: str                 # spiegazione human-readable del perché
+    actuator_name: str
+    action: str
+    reason: str
     timestamp: float = field(default_factory=time.time)
 
     def __str__(self) -> str:
@@ -82,9 +82,9 @@ class SimulatedActuator:
         if not self._active:
             GPIO.output(self.pin, GPIO.HIGH)
             self._active = True
-            msg = f"🟢 {self.name} ATTIVATO → {reason}"
+            msg = f"{self.name} ATTIVATO → {reason}"
             logger.info(msg)
-            print(f"   {msg}")
+            print(msg)
         else:
             logger.debug(f"{self.name} già attivo, motivo aggiornato: {reason}")
 
@@ -107,9 +107,9 @@ class SimulatedActuator:
         if self._active:
             GPIO.output(self.pin, GPIO.LOW)
             self._active = False
-            msg = f"🔴 {self.name} DISATTIVATO → {reason}"
+            msg = f"{self.name} DISATTIVATO → {reason}"
             logger.info(msg)
-            print(f"   {msg}")
+            print(msg)
 
         return ActionResult(
             actuator_name=self.name,
@@ -144,7 +144,7 @@ class IrrigationActuator(SimulatedActuator):
     Pin GPIO: 17 (BCM)
     """
     name = "IrrigationActuator"
-    pin  = 17
+    pin = 17
 
 
 class VentilationActuator(SimulatedActuator):
@@ -158,7 +158,7 @@ class VentilationActuator(SimulatedActuator):
     Pin GPIO: 27 (BCM)
     """
     name = "VentilationActuator"
-    pin  = 27
+    pin = 27
 
 
 class AlarmActuator(SimulatedActuator):
@@ -173,7 +173,7 @@ class AlarmActuator(SimulatedActuator):
     Pin GPIO: 22 (BCM)
     """
     name = "AlarmActuator"
-    pin  = 22
+    pin = 22
 
 
 class NotificationActuator:
@@ -193,19 +193,17 @@ class NotificationActuator:
         Invia una notifica (simulata) all'agricoltore.
 
         Args:
-            message:  testo della notifica
+            message: testo della notifica
             severity: "INFO" | "WARNING" | "CRITICAL"
 
         Returns:
             ActionResult con il messaggio inviato
         """
         self._notifications_sent += 1
-        icons = {"INFO": "ℹ️", "WARNING": "⚠️", "CRITICAL": "🚨"}
-        icon = icons.get(severity, "📢")
 
-        msg = f"{icon} NOTIFICA [{severity}] → {message}"
+        msg = f"NOTIFICA [{severity}] → {message}"
         logger.warning(msg) if severity != "INFO" else logger.info(msg)
-        print(f"   {msg}")
+        print(msg)
 
         return ActionResult(
             actuator_name=self.name,
@@ -233,9 +231,9 @@ class ActuatorBank:
     """
 
     def __init__(self):
-        self.irrigation   = IrrigationActuator()
-        self.ventilation  = VentilationActuator()
-        self.alarm        = AlarmActuator()
+        self.irrigation = IrrigationActuator()
+        self.ventilation = VentilationActuator()
+        self.alarm = AlarmActuator()
         self.notification = NotificationActuator()
 
         logger.info("ActuatorBank inizializzato con 4 attuatori simulati")
@@ -251,11 +249,11 @@ class ActuatorBank:
     def get_status(self) -> dict:
         """Restituisce lo stato corrente di tutti gli attuatori."""
         return {
-            "irrigation_active":  self.irrigation.is_active,
+            "irrigation_active": self.irrigation.is_active,
             "ventilation_active": self.ventilation.is_active,
-            "alarm_active":       self.alarm.is_active,
+            "alarm_active": self.alarm.is_active,
             "notifications_sent": self.notification.total_notifications,
-            "gpio_states":        GPIO.get_all_states(),
+            "gpio_states": GPIO.get_all_states(),
         }
 
     def __repr__(self) -> str:
