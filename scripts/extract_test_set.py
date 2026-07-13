@@ -173,7 +173,7 @@ def extract_test_set(
         )
 
     manifest_path = output_root / "test_set_manifest.csv"
-    with open(manifest_path, "w", newline="") as f:
+    with open(manifest_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
             f, fieldnames=["filtered_idx", "full_dataset_idx", "class", "src_path", "dst_path"]
         )

@@ -160,7 +160,7 @@ def section_header(icon: str, label: str, color: str = ACCENT["teal"]) -> None:
 # ══════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_config() -> dict:
-    with open(os.path.join(ROOT, "config.yaml")) as f:
+    with open(os.path.join(ROOT, "config.yaml"), encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 

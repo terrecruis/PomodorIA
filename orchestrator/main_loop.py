@@ -387,7 +387,7 @@ class Orchestrator:
 def load_config(config_path: str = None) -> dict:
     if config_path is None:
         config_path = os.path.join(ROOT, "config.yaml")
-    with open(config_path, "r") as f:
+    with open(config_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 

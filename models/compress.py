@@ -62,7 +62,7 @@ torch.backends.quantized.engine = _QUANT_BACKEND
 def load_config(config_path: str = None) -> dict:
     if config_path is None:
         config_path = os.path.join(ROOT, "config.yaml")
-    with open(config_path, "r") as f:
+    with open(config_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
@@ -510,7 +510,7 @@ def save_benchmark_csv(results: list, output_path: str) -> None:
     ]
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    with open(output_path, "w", newline="") as f:
+    with open(output_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         for row in results:
