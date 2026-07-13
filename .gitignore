@@ -20,7 +20,7 @@ ENV/
 # datasets/
 
 # ─── Modelli pesanti ───
-*.pth
+# *.pth
 *.onnx
 models/optimized/
 
@@ -52,5 +52,3 @@ ehthumbs.db
 
 # ─── Documentazione personale (Overleaf) ───
 docs/Spiegazione_PomodorIA.tex
-
-plantvillage_testset/
