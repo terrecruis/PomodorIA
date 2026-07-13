@@ -100,9 +100,6 @@ class InferenceEngine:
     # ─────────────────────────────────────────────────────────────
 
     def _load_model(self) -> None:
-        """
-        Carica il modello in base alla modalità configurata.
-        """
         if self.mode == "full_precision":
             self._load_pytorch_model(
                 checkpoint_path=self.config["paths"]["checkpoint"],
