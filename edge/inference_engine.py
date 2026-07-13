@@ -1,26 +1,8 @@
-"""
-edge/inference_engine.py — Edge AI Layer (IoTWF Livello 3)
+"""edge/inference_engine.py — Edge AI Layer (IoTWF Livello 3).
 
-Wrapper di inferenza che carica la TomatoCNN e la esegue su un tensor
-già preprocessato dalla VirtualCamera. Simula il comportamento di un
-motore di inferenza su Raspberry Pi: singolo core CPU, no GPU, misura
-RAM e latenza ad ogni predizione.
-
-Supporta due modalità (config.yaml → model.mode):
-  - "full_precision" → modello originale float32 (.pth baseline)
-  - "optimized" → modello compresso prodotto da models/compress.py
-                        (PyTorch quantizzato oppure ONNX Runtime)
-
-Flusso:
-    CameraCapture.image_tensor
-           │
-           ▼
-    [InferenceEngine.predict()]
-           │ torch.no_grad()
-           │ softmax(logits) → argmax → label
-           │ misura tempo + RAM
-           ▼
-    InferenceResult
+Supporta due modalità (config.yaml → model.mode): "full_precision" (baseline
+.pth) oppure "optimized" (modello compresso da models/compress.py, PyTorch
+quantizzato o ONNX Runtime).
 """
 
 import sys
@@ -53,18 +35,7 @@ from models.model import TomatoCNN
 # ══════════════════════════════════════════════════════════════
 @dataclass
 class InferenceResult:
-    """
-    Risultato di una singola inferenza della CNN.
-
-    Campi:
-        predicted_label : nome della classe predetta (es. "Tomato___Early_blight")
-        predicted_idx : indice numerico della classe predetta (0–9)
-        confidence : probabilità softmax della classe predetta (0.0–1.0)
-        all_probabilities : vettore softmax completo (10 valori), utile per log/debug
-        inference_time_ms : tempo totale di inferenza in millisecondi
-        ram_used_mb : RAM del processo in quel momento (MB) — proxy Raspberry Pi
-        model_mode : modalità del modello ("full_precision" o "optimized")
-    """
+    """Risultato di una singola inferenza della CNN."""
     predicted_label: str
     predicted_idx: int
     confidence: float
@@ -74,7 +45,6 @@ class InferenceResult:
     model_mode: str
 
     def is_healthy(self) -> bool:
-        """True se la pianta è classificata come sana."""
         return self.predicted_label == "Tomato___healthy"
 
     def is_low_confidence(self, threshold: float = 0.70) -> bool:
@@ -96,30 +66,10 @@ class InferenceResult:
 # Inference Engine
 # ══════════════════════════════════════════════════════════════
 class InferenceEngine:
-    """
-    Motore di inferenza Edge AI per TomatoCNN.
-
-    Carica il modello una sola volta all'avvio e lo mantiene in memoria.
-    Ogni chiamata a predict() esegue l'inferenza su un singolo tensor
-    (1, 3, 64, 64) già preprocessato dalla VirtualCamera.
-
-    Modalità supportate:
-        - "full_precision" : PyTorch float32, modello .pth originale
-        - "optimized" : PyTorch INT8 (quantizzato) o ONNX Runtime
-
-    Simulazione Raspberry Pi:
-        - torch.set_num_threads(1) → 1 solo core CPU
-        - device = "cpu" → no GPU/MPS
-        - psutil.Process().memory_info().rss → misura RAM
-    """
+    """Motore di inferenza Edge AI per TomatoCNN. Carica il modello una sola
+    volta all'avvio e lo mantiene in memoria."""
 
     def __init__(self, config: dict):
-        """
-        Inizializza e carica il modello.
-
-        Args:
-            config: dizionario letto da config.yaml
-        """
         self.config = config
         self.classes: List[str] = config["model"]["classes"]
         self.mode: str = config["model"].get("mode", "full_precision")
@@ -134,6 +84,8 @@ class InferenceEngine:
         # ── Caricamento modello ──────────────────────────────────
         self._model_pytorch: Optional[torch.nn.Module] = None
         self._onnx_session = None # onnxruntime.InferenceSession, se usato
+        self._onnx_path: Optional[str] = None
+        self._checkpoint_path: Optional[str] = None
         self.loaded_variant: str = "full_precision" # etichetta descrittiva del file caricato
 
         self._load_model()
@@ -150,13 +102,6 @@ class InferenceEngine:
     def _load_model(self) -> None:
         """
         Carica il modello in base alla modalità configurata.
-
-        full_precision: carica il checkpoint .pth originale (float32)
-        optimized: carica la variante scelta da `model.optimized_variant`
-                        (config.yaml), oppure la cerca in cascata se
-                        variant == "auto":
-                            ONNX quantizzato > PyTorch pruned+quantizzato >
-                            PyTorch pruned > fallback full_precision
         """
         if self.mode == "full_precision":
             self._load_pytorch_model(
@@ -238,18 +183,8 @@ class InferenceEngine:
             )
 
     def _load_pytorch_model(self, checkpoint_path: str, quantized: bool) -> None:
-        """
-        Carica un modello PyTorch (.pth) con state_dict.
-
-        Il modello originale è stato salvato come:
-            torch.save(model.state_dict(), '...pth')
-        quindi va prima istanziata l'architettura e poi caricati i pesi.
-
-        Args:
-            checkpoint_path: percorso al file .pth
-            quantized: True se il .pth contiene un modello già quantizzato
-                       (serializzato con torch.save dopo quantize_dynamic)
-        """
+        """Carica un modello PyTorch (.pth). Il checkpoint contiene solo lo
+        state_dict, quindi va prima istanziata l'architettura."""
         cfg_model = self.config["model"]
 
         print(f"Caricamento modello PyTorch da '{checkpoint_path}'...")
@@ -263,7 +198,6 @@ class InferenceEngine:
                 weights_only=False # necessario per modelli quantizzati
             )
         else:
-            # Ricostruisce l'architettura e carica i pesi (state_dict)
             architecture = TomatoCNN(
                 n_filters=cfg_model["n_filters"],
                 kernel_size=cfg_model["kernel_size"],
@@ -281,17 +215,12 @@ class InferenceEngine:
         # Modalità inferenza: disattiva Dropout, BatchNorm in eval mode
         self._model_pytorch.eval()
         self._model_pytorch.to(self.device)
+        self._checkpoint_path = checkpoint_path
 
         size_mb = os.path.getsize(checkpoint_path) / (1024 ** 2)
-        print(f"   Modello caricato | dimensione file: {size_mb:.2f} MB")
+        print(f"Modello caricato | dimensione file: {size_mb:.2f} MB")
 
     def _load_onnx_model(self, onnx_path: str) -> None:
-        """
-        Carica un modello ONNX tramite onnxruntime.
-
-        Args:
-            onnx_path: percorso al file .onnx
-        """
         try:
             import onnxruntime as ort
         except ImportError:
@@ -307,40 +236,23 @@ class InferenceEngine:
             onnx_path,
             providers=["CPUExecutionProvider"]
         )
+        self._onnx_path = onnx_path
 
         size_mb = os.path.getsize(onnx_path) / (1024 ** 2)
-        print(f"   Modello ONNX caricato | dimensione file: {size_mb:.2f} MB")
+        print(f"Modello ONNX caricato | dimensione file: {size_mb:.2f} MB")
 
     # ─────────────────────────────────────────────────────────────
     # Inferenza principale
     # ─────────────────────────────────────────────────────────────
 
     def predict(self, image_tensor: torch.Tensor) -> InferenceResult:
-        """
-        Esegue l'inferenza su un tensor già preprocessato.
-
-        Il tensor deve avere shape (1, 3, 64, 64) e valori normalizzati
-        con ImageNet mean/std — esattamente come restituito da
-        VirtualCameraSensor.capture().
-
-        Args:
-            image_tensor: tensor (1, 3, 64, 64), float32
-
-        Returns:
-            InferenceResult con predizione, confidenza e metriche di performance
-        """
+        """Esegue l'inferenza su un tensor (1, 3, 64, 64) già preprocessato."""
         if self._onnx_session is not None:
             return self._predict_onnx(image_tensor)
         else:
             return self._predict_pytorch(image_tensor)
 
     def _predict_pytorch(self, image_tensor: torch.Tensor) -> InferenceResult:
-        """
-        Inferenza con PyTorch (full_precision o quantizzato INT8).
-
-        torch.no_grad() disattiva il calcolo del grafo dei gradienti,
-        che in inferenza è inutile e spreca memoria/tempo.
-        """
         tensor = image_tensor.to(self.device)
 
         ram_before_mb = self._process.memory_info().rss / (1024 ** 2)
@@ -372,11 +284,6 @@ class InferenceEngine:
         )
 
     def _predict_onnx(self, image_tensor: torch.Tensor) -> InferenceResult:
-        """
-        Inferenza con ONNX Runtime.
-
-        ONNX Runtime richiede numpy array in input (non tensor PyTorch).
-        """
         import numpy as np
 
         np_input = image_tensor.numpy().astype(np.float32)
@@ -417,16 +324,11 @@ class InferenceEngine:
     # ─────────────────────────────────────────────────────────────
 
     def get_model_size_mb(self) -> float:
-        """
-        Stima la dimensione del modello in memoria (in MB).
-        Per il modello PyTorch conta i parametri, per ONNX usa la dimensione del file.
-        """
-        if self._model_pytorch is not None:
-            total_params = sum(
-                p.numel() * p.element_size()
-                for p in self._model_pytorch.parameters()
-            )
-            return total_params / (1024 ** 2)
+        """Dimensione su disco del file di pesi effettivamente caricato (MB)."""
+        if self._onnx_path is not None:
+            return os.path.getsize(self._onnx_path) / (1024 ** 2)
+        if self._checkpoint_path is not None:
+            return os.path.getsize(self._checkpoint_path) / (1024 ** 2)
         return 0.0
 
     def count_nonzero_params(self) -> int:
@@ -439,13 +341,11 @@ class InferenceEngine:
         return total
 
     def count_total_params(self) -> int:
-        """Conta il totale dei parametri del modello."""
         if self._model_pytorch is None:
             return 0
         return sum(p.numel() for p in self._model_pytorch.parameters())
 
     def get_info(self) -> dict:
-        """Restituisce un dizionario con le info del motore di inferenza."""
         return {
             "mode": self.mode,
             "variant": self.loaded_variant,

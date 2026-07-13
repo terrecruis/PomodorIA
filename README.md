@@ -48,7 +48,7 @@ che ha confrontato una FCNN e una CNN sullo stesso task:
 | | FCNN [2L-512-ReLU] | **CNN [64f-k3-3blk]** |
 |---|---|---|
 | Accuracy (holdout 80/20) | ~84% | **~96%** |
-| Accuracy media (Stratified 5-Fold, Weighted CE) | — | **94.98%** (σ < 3.2%, range 93.32–96.52%) |
+| Accuracy media (Stratified 5-Fold, Weighted CE) | — | **94.98%** (σ < 3.2%, range 93.32-96.52%) |
 | Recall minimo per classe | 0.69 (Target Spot) | 0.90 |
 | Punto debole | Non percepisce la struttura spaziale → confonde Early blight/Late blight/Bacterial spot | Classi rare (Tomato mosaic virus, 299 img) restano le più critiche |
 
@@ -226,7 +226,7 @@ spostato su hardware reale senza riscritture.
 ### 3.5 Orchestratore (main loop)
 
 Ciclo `sense → think → act → log`, eseguito a intervalli regolari (es. ogni
-5–10 secondi simulati, accelerabile per demo):
+5-10 secondi simulati, accelerabile per demo):
 
 ```python
 while True:
@@ -297,7 +297,7 @@ La suite di benchmark è implementata in `models/compress.py` (eseguita automati
 | **Pruned + Dynamic Quant (INT8)** | 82.2% | 9.43 MB | 4.32 ms | 370,816 / 259,711 | 30.0% |
 | **ONNX Quantized (INT8)** | **95.0%** | **8.37 MB** | 6.10 ms | — | — |
 
-> **Nota sui risultati Edge**: la **quantizzazione ONNX** è la scelta più equilibrata: riduce la dimensione del modello di **~4x** (da 33.4 MB a 8.4 MB) preservando l'accuratezza del modello originale (95.0%), perché applica la sola quantizzazione senza pruning. Il **pruning strutturato al 30%**, applicato in un unico passo senza fine-tuning di recupero, penalizza invece sensibilmente l'accuratezza (da 95.0% a 82.2%) — è il classico trade-off tra compressione aggressiva e qualità del modello. Le latenze restano tutte nello stesso ordine di grandezza (3–6 ms) data la ridotta dimensione della rete.
+> **Nota sui risultati Edge**: la **quantizzazione ONNX** è la scelta più equilibrata: riduce la dimensione del modello di **~4x** (da 33.4 MB a 8.4 MB) preservando l'accuratezza del modello originale (95.0%), perché applica la sola quantizzazione senza pruning. Il **pruning strutturato al 30%**, applicato in un unico passo senza fine-tuning di recupero, penalizza invece sensibilmente l'accuratezza (da 95.0% a 82.2%) — è il classico trade-off tra compressione aggressiva e qualità del modello. Le latenze restano tutte nello stesso ordine di grandezza (3-6 ms) data la ridotta dimensione della rete.
 
 ---
 

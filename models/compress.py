@@ -1,28 +1,10 @@
-"""
-models/compress.py — Pipeline di Compressione del Modello (Fase 4)
+"""models/compress.py — Pipeline di Compressione del Modello (Fase 4).
 
-Script standalone da eseguire UNA SOLA VOLTA per produrre i modelli
-compressi in models/optimized/.
+Script standalone (da eseguire una sola volta) che applica structured
+pruning, dynamic quantization INT8 ed export ONNX, producendo in
+models/optimized/ i modelli compressi e benchmarks/benchmark_results.csv.
 
-Tecniche applicate in sequenza:
-  1. Structured Pruning (ln_structured su filtri Conv2d)
-     → rimuove interi filtri meno importanti → riduce le operazioni su CPU
-  2. Quantizzazione dinamica INT8 (torch.quantization.quantize_dynamic)
-     → converte i pesi float32 → int8, senza fase di calibrazione
-  3. Export ONNX → motore di inferenza più realistico per Raspberry Pi
-
-Output generati in models/optimized/:
-  - model_pruned.pth (solo pruned, float32)
-  - model_pruned_quantized.pth (pruned + quantizzato INT8, PyTorch)
-  - model_quantized.onnx (ONNX Runtime, pronto per il deploy)
-  - benchmark_results.csv (tabella §4.3 del README)
-
-Utilizzo:
-    python models/compress.py
-    python models/compress.py --sparsity 0.5 # pruning al 50%
-
-Il benchmark viene eseguito automaticamente al termine sul test set,
-misurando accuracy / dimensione / latenza per ogni variante.
+Utilizzo: python models/compress.py [--sparsity 0.5]
 """
 
 import os
@@ -70,16 +52,6 @@ def load_config(config_path: str = None) -> dict:
 # Utility: carica il dataset di test per il benchmark
 # ══════════════════════════════════════════════════════════════
 def get_test_loader(config: dict, max_images: int = 500) -> DataLoader:
-    """
-    Restituisce un DataLoader sul test set del dataset PlantVillage.
-
-    Args:
-        config: configurazione del progetto
-        max_images: numero massimo di immagini da caricare (per velocità)
-
-    Returns:
-        DataLoader con batch_size=32, shuffle=False
-    """
     preproc = config["preprocessing"]
     transform = transforms.Compose([
         transforms.Resize((preproc["image_size"], preproc["image_size"])),
@@ -112,20 +84,7 @@ def measure_pytorch_metrics(
     n_measure: int = 100,
     quantized: bool = False,
 ) -> dict:
-    """
-    Misura accuracy, latenza media e uso RAM di un modello PyTorch.
-
-    Args:
-        model: modello da valutare (già in .eval())
-        loader: DataLoader del test set
-        classes: lista delle classi
-        n_warmup: predizioni di warmup (non conteggiate nei tempi)
-        n_measure: predizioni su cui mediare il tempo di inferenza
-        quantized: se True, imposta qnnpack engine prima dell'inferenza
-
-    Returns:
-        dict con accuracy, avg_inference_ms, ram_mb, nonzero_params
-    """
+    """Misura accuracy, latenza media e uso RAM di un modello PyTorch."""
     torch.set_num_threads(1) # simula 1 core Raspberry Pi
     if quantized:
         # I modelli quantizzati con qnnpack richiedono che il backend
@@ -189,16 +148,8 @@ def measure_file_size_mb(path: str) -> float:
 # FASE 1: Caricamento baseline
 # ══════════════════════════════════════════════════════════════
 def load_baseline(config: dict) -> TomatoCNN:
-    """
-    Carica il modello originale (checkpoint .pth baseline).
-
-    Il modello è stato salvato con:
-        torch.save(model.state_dict(), 'weights/xxx.pth')
-    quindi va prima istanziata l'architettura e poi caricati i pesi.
-
-    Returns:
-        TomatoCNN in modalità eval, su CPU
-    """
+    """Carica il checkpoint .pth baseline (solo state_dict: va prima
+    istanziata l'architettura e poi caricati i pesi)."""
     cfg = config["model"]
     model = TomatoCNN(
         n_filters=cfg["n_filters"],
@@ -225,24 +176,9 @@ def apply_structured_pruning(
     model: nn.Module,
     sparsity: float = 0.30,
 ) -> nn.Module:
-    """
-    Applica structured pruning (ln_structured) a tutti i layer Conv2d.
-
-    Il pruning strutturato rimuove interi filtri convoluzionali (dim=0)
-    in base alla norma L1 dei loro pesi. I filtri con norma più bassa
-    (= meno "importanti") vengono azzerati.
-
-    Vantaggi rispetto a unstructured pruning:
-        - Riduce realmente le operazioni su CPU (non solo azzera pesi)
-        - Non richiede formati sparsi per beneficiarne in latenza
-
-    Args:
-        model: modello PyTorch da comprimere (modifica in-place)
-        sparsity: frazione di filtri da azzerare per layer (0.0–1.0)
-
-    Returns:
-        Modello con pruning applicato (mask inclusa)
-    """
+    """Applica structured pruning (ln_structured) a tutti i layer Conv2d:
+    rimuove interi filtri (dim=0) in base alla norma L1 dei pesi, riducendo
+    realmente le operazioni su CPU (a differenza dell'unstructured pruning)."""
     model_pruned = copy.deepcopy(model)
 
     conv_layers_pruned = 0
@@ -266,16 +202,8 @@ def apply_structured_pruning(
 
 
 def make_pruning_permanent(model: nn.Module) -> nn.Module:
-    """
-    Rende il pruning permanente rimuovendo le maschere e il parametro originale.
-
-    Dopo prune.ln_structured(), i pesi azzerati sono mantenuti come
-    'weight_orig' + 'weight_mask'. Con remove() si fonde tutto nel
-    parametro 'weight' definitivo, eliminando l'overhead delle maschere.
-
-    Returns:
-        Modello con pesi definitivamente potati (nessuna maschera residua)
-    """
+    """Dopo ln_structured() i pesi azzerati restano come 'weight_orig' +
+    'weight_mask'; remove() li fonde nel parametro 'weight' definitivo."""
     for name, module in model.named_modules():
         if isinstance(module, nn.Conv2d) and prune.is_pruned(module):
             prune.remove(module, "weight")
@@ -288,24 +216,9 @@ def make_pruning_permanent(model: nn.Module) -> nn.Module:
 # FASE 3: Quantizzazione dinamica INT8
 # ══════════════════════════════════════════════════════════════
 def apply_dynamic_quantization(model: nn.Module) -> nn.Module:
-    """
-    Applica Dynamic Quantization ai layer Conv2d e Linear.
-
-    La dynamic quantization:
-      - Converte i PESI float32 → int8 a compile-time (riduce dimensione)
-      - Quantizza le ATTIVAZIONI dinamicamente a runtime (per ogni batch)
-      - Non richiede calibrazione
-      - Funziona affidabilmente su tutti i backend/OS
-
-    Nota: la PTQ statica (preferibile per Conv2d) è deprecata in PyTorch >= 2.4
-    su macOS ARM. La dynamic quantization è la scelta più robusta per il PoC.
-
-    Args:
-        model: modello da quantizzare (verrà copiato in profondo)
-
-    Returns:
-        Modello con pesi INT8 (dynamic quantization)
-    """
+    """Quantizza i layer Conv2d/Linear: pesi INT8 a compile-time, attivazioni
+    quantizzate a runtime, senza calibrazione. La PTQ statica (preferibile per
+    Conv2d) è deprecata in PyTorch >= 2.4 su macOS ARM, da qui la scelta."""
     import warnings
     model_copy = copy.deepcopy(model)
     model_copy.eval()
@@ -331,19 +244,6 @@ def export_to_onnx(
     output_path: str,
     input_size: tuple = (1, 3, 64, 64),
 ) -> None:
-    """
-    Esporta il modello PyTorch in formato ONNX.
-
-    ONNX (Open Neural Network Exchange) è lo standard de facto per
-    l'inferenza embedded. onnxruntime è spesso 2-3x più veloce di
-    PyTorch puro su CPU e is il motore di inferenza più realistico
-    per un Raspberry Pi reale.
-
-    Args:
-        model: modello PyTorch da esportare
-        output_path: percorso del file .onnx di output
-        input_size: shape del tensor di input (batch=1, C=3, H=64, W=64)
-    """
     model.eval()
     dummy_input = torch.randn(*input_size)
 
@@ -377,13 +277,6 @@ def export_to_onnx(
 
 
 def quantize_onnx(onnx_path: str, output_path: str) -> None:
-    """
-    Quantizza un modello ONNX da float32 a INT8 usando onnxruntime.
-
-    Args:
-        onnx_path: percorso del file .onnx float32 in input
-        output_path: percorso del file .onnx INT8 di output
-    """
     try:
         from onnxruntime.quantization import quantize_dynamic, QuantType
     except ImportError:
@@ -420,19 +313,6 @@ def measure_onnx_metrics(
     n_warmup: int = 5,
     n_measure: int = 100,
 ) -> dict:
-    """
-    Misura le metriche di un modello ONNX tramite onnxruntime.
-
-    Args:
-        onnx_path: percorso del file .onnx
-        loader: DataLoader del test set
-        classes: lista delle classi
-        n_warmup: predizioni di warmup
-        n_measure: predizioni su cui mediare il tempo
-
-    Returns:
-        dict con accuracy, avg_inference_ms, ram_mb
-    """
     try:
         import onnxruntime as ort
         import numpy as np
@@ -485,16 +365,7 @@ def measure_onnx_metrics(
 # Salvataggio tabella benchmark (CSV)
 # ══════════════════════════════════════════════════════════════
 def save_benchmark_csv(results: list, output_path: str) -> None:
-    """
-    Salva i risultati del benchmark in formato CSV.
-
-    La tabella prodotta corrisponde alla §4.3 del README:
-        | Variante | Accuracy | Size (MB) | Latenza (ms) | Params non-zero |
-
-    Args:
-        results: lista di dict con i risultati per ogni variante
-        output_path: percorso del file CSV di output
-    """
+    """Salva i risultati del benchmark in CSV"""
     if not results:
         return
 
@@ -547,32 +418,6 @@ def print_benchmark_table(results: list) -> None:
 def run_compression_pipeline(
     sparsity: float = 0.30,
 ) -> None:
-    """
-    Esegue l'intera pipeline di compressione:
-
-        Baseline (.pth)
-            │
-            ├─── Benchmark baseline
-            │
-            ├─── Structured Pruning (sparsity%)
-            │ │
-            │ ├─── Salva model_pruned.pth
-            │ └─── Benchmark pruned
-            │
-            ├─── Quantizzazione dinamica INT8
-            │ │
-            │ ├─── Salva model_pruned_quantized.pth
-            │ └─── Benchmark pruned+quantized
-            │
-            └─── Export ONNX → Quantizzazione ONNX
-                      │
-                      ├─── Salva model_base.onnx
-                      ├─── Salva model_quantized.onnx (INT8)
-                      └─── Benchmark ONNX
-
-    Args:
-        sparsity: frazione di filtri da potare (0.0–1.0)
-    """
     print("\n" + "═" * 60)
     print("PomodorIA — Pipeline Compressione Modello (Fase 4)")
     print("═" * 60)

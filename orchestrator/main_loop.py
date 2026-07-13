@@ -1,27 +1,5 @@
 """
-orchestrator/main_loop.py — Orchestratore (Ciclo sense → think → act → log)
-
-Coordina tutti i componenti del sistema in un ciclo continuo:
-
-    1. SENSE → VirtualCamera.capture() + EnvironmentSensorSimulator.read()
-    2. THINK → InferenceEngine.predict() + DecisionAgent.decide()
-    3. ACT → ActuatorBank applica le azioni decise
-    4. LOG → PoC Logger registra ogni ciclo su CSV
-
-Il main loop rispetta l'architettura IoTWF a 7 livelli:
-    Livello 1 (Physical/Sensors) → VirtualCamera, EnvironmentSimulator
-    Livello 3 (Edge Computing) → InferenceEngine (CNN compressa su CPU)
-    Livello 6 (Application) → DecisionAgent (regole PEAS)
-    Livello 4 (Data Accumulation)→ Logger CSV/SQLite
-
-Modalità:
-    demo_mode=True → cicli veloci, stampa dettagliata a console
-    demo_mode=False → cicli ogni N secondi, log silenzioso
-
-Utilizzo:
-    python orchestrator/main_loop.py
-    python orchestrator/main_loop.py --cycles 50 --interval 2
-    python orchestrator/main_loop.py --class Tomato___Early_blight --cycles 20
+    orchestrator/main_loop.py — Orchestratore (Ciclo sense → think → act → log).
 """
 
 import sys
@@ -52,18 +30,7 @@ from actuators.actuators import ActuatorBank
 # Logger strutturato su CSV
 # ══════════════════════════════════════════════════════════════
 class PoCLogger:
-    """
-    Registra ogni ciclo sense-think-act su file CSV.
-
-    Ogni riga corrisponde a un ciclo e contiene:
-        - timestamp, cycle_idx
-        - image_path, true_label
-        - temperatura, umidità, soil_moisture, luce
-        - predicted_label, confidence, inference_ms, ram_mb
-        - disease_category, consecutive_alerts
-        - azioni attuatori (boolean)
-        - is_correct (predizione == vera classe)
-    """
+    """Registra ogni ciclo sense-think-act su file CSV."""
 
     FIELDNAMES = [
         "timestamp", "cycle_idx",
@@ -80,10 +47,6 @@ class PoCLogger:
     ]
 
     def __init__(self, log_dir: str):
-        """
-        Args:
-            log_dir: cartella dove salvare i file di log
-        """
         Path(log_dir).mkdir(parents=True, exist_ok=True)
         timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.log_path = os.path.join(log_dir, f"run_{timestamp_str}.csv")
@@ -99,17 +62,6 @@ class PoCLogger:
 
     def log(self, cycle_idx: int, capture, env, inference, decision,
              actuator_status: dict, cpu_percent: float = 0.0) -> None:
-        """
-        Scrive una riga nel CSV per il ciclo corrente.
-
-        Args:
-            cycle_idx: indice del ciclo (0-based)
-            capture: CameraCapture dal VirtualCamera
-            env: EnvironmentReading dal simulatore
-            inference: InferenceResult dall'InferenceEngine
-            decision: AgentDecision dall'agente
-            actuator_status: dict con stato degli attuatori (da ActuatorBank.get_status())
-        """
         is_correct = (capture.true_label == inference.predicted_label)
         reasoning_short = " | ".join(decision.reasoning[:2]) # max 2 righe
 
@@ -142,7 +94,6 @@ class PoCLogger:
         self.rows_written += 1
 
     def close(self) -> None:
-        """Chiude il file di log."""
         if not self._file.closed:
             self._file.close()
         print(f"Log chiuso: {self.rows_written} righe scritte → {self.log_path}")
@@ -225,22 +176,9 @@ def print_final_stats(
 # Main loop
 # ══════════════════════════════════════════════════════════════
 class Orchestrator:
-    """
-    Coordina il ciclo sense → think → act → log.
-
-    Parametri configurabili da config.yaml (sezione "orchestrator"):
-        cycle_interval_sec: secondi di pausa tra cicli
-        max_cycles: 0 = infinito
-        demo_mode: True = output dettagliato
-    """
+    """Coordina il ciclo sense → think → act → log."""
 
     def __init__(self, config: dict, forced_class: str | None = None):
-        """
-        Args:
-            config: dizionario di configurazione (config.yaml)
-            forced_class: se impostato, la VirtualCamera pesca sempre
-                          da questa classe (utile per demo mirate)
-        """
         self.config = config
         cfg_orch = config.get("orchestrator", {})
         self.cycle_interval = cfg_orch.get("cycle_interval_sec", 5)
@@ -266,6 +204,11 @@ class Orchestrator:
         self.agent = DecisionAgent(config, self.actuators)
         self.poc_logger = PoCLogger(config["paths"]["log_dir"])
 
+        # psutil.Process().cpu_percent() misura la % di CPU usata dal SOLO
+        # processo di PomodorIA
+        self._proc = psutil.Process()
+        self._proc.cpu_percent(interval=None)
+
         # ── Gestione segnale CTRL+C ───────────────────────────
         self._running = True
         signal.signal(signal.SIGINT, self._handle_interrupt)
@@ -281,13 +224,7 @@ class Orchestrator:
         self._running = False
 
     def run(self) -> None:
-        """
-        Avvia il ciclo sense → think → act → log.
-
-        Il ciclo continua finché:
-        - max_cycles è raggiunto (se > 0)
-        - l'utente preme CTRL+C
-        """
+        """Avvia il ciclo, finché max_cycles è raggiunto o arriva CTRL+C."""
         cycle_idx = 0
         correct = 0
         latencies: list[float] = []
@@ -323,7 +260,7 @@ class Orchestrator:
             # 3. ACT (già eseguito dentro decide())
             # ══════════════════════════════════════════════════
             actuator_status = self.actuators.get_status()
-            cpu_pct = psutil.cpu_percent(interval=None)
+            cpu_pct = self._proc.cpu_percent(interval=None)
 
             # ══════════════════════════════════════════════════
             # 4. LOG
@@ -349,7 +286,7 @@ class Orchestrator:
                 t_cycle = (time.perf_counter() - t_cycle_start) * 1000
                 print(f"\nCiclo completato in {t_cycle:.0f}ms | "
                       f"Accuracy live: {correct/(cycle_idx+1):.1%} | "
-                      f"CPU: {cpu_pct:.0f}% | "
+                      f"CPU (processo): {cpu_pct:.0f}% | "
                       f"Attuatori: {self.actuators}")
             else:
                 ok = "" if capture.true_label == inference.predicted_label else ""

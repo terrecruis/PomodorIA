@@ -95,7 +95,7 @@ virtual_camera:
 # ─── Compressione Modello (Fase 4) ────────────────────────
 compression:
   pruning:
-    sparsity: 0.30              # frazione filtri Conv2d da potare (0.0–1.0)
+    sparsity: 0.30              # frazione filtri Conv2d da potare (0.0-1.0)
     method: "ln_structured"     # "ln_structured" (structured) o "l1_unstructured"
     norm: 1                     # norma usata per il ranking (L1)
   quantization:

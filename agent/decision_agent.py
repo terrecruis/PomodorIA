@@ -1,33 +1,4 @@
-"""
-agent/decision_agent.py — Agente Decisionale (IoTWF Livello 6 — Application)
-
-Implementa un agente razionale basato su modello + obiettivi secondo
-il modello PEAS definito nella Sezione 3.3 del README:
-
-    Performance → diagnosi corrette, risparmio idrico, riduzione falsi allarmi
-    Environment → serra simulata (parzialmente osservabile, dinamica)
-    Actuators → pompa irrigazione, ventola, LED allarme, notifica
-    Sensors → fotocamera virtuale, sensori ambientali simulati
-
-Tipologia agente: REATTIVO BASATO SU MODELLO + BASATO SU OBIETTIVI
-    - Mantiene stato interno (contatore rilevamenti consecutivi,
-      storico predizioni)
-    - Regole condizione → azione (priorità decrescente):
-        1. Confidenza bassa → human-in-the-loop
-        2. Malattia virale → allarme alta urgenza
-        3. Malattia fungina + umidità alta → ventilazione
-        4. Soil moisture bassa → irrigazione
-        5. Temperatura alta → ventilazione
-        6. Healthy → disattiva tutto
-
-Classi patologiche per categoria (da README §3.3):
-    FUNGINE: Early_blight, Late_blight, Leaf_Mold, Septoria_leaf_spot,
-              Target_Spot
-    VIRALI: Tomato_Yellow_Leaf_Curl_Virus, Tomato_mosaic_virus
-    PARASSITI: Spider_mites
-    BATTERICHE: Bacterial_spot
-    SANA: healthy
-"""
+"""agent/decision_agent.py — Agente Decisionale (IoTWF Livello 6 — Application)."""
 
 import logging
 import time
@@ -76,21 +47,17 @@ HEALTHY_CLASS = "Tomato___healthy"
 ALL_DISEASES = FUNGAL_DISEASES | VIRAL_DISEASES | PEST_DISEASES | BACTERIAL_DISEASES
 
 
+def _friendly_label(label: str) -> str:
+    """Nome leggibile per i messaggi (es. 'Tomato___Early_blight' -> 'Early blight')."""
+    return label.replace("Tomato___", "").replace("_", " ")
+
+
 # ══════════════════════════════════════════════════════════════
 # Dataclass per il risultato della decisione dell'agente
 # ══════════════════════════════════════════════════════════════
 @dataclass
 class AgentDecision:
-    """
-    Raccoglie tutte le azioni decise dall'agente per un ciclo.
-
-    Campi:
-        actions: lista di ActionResult per ogni attuatore coinvolto
-        reasoning: lista di stringhe che spiegano la logica decisionale
-        disease_category: "healthy" | "fungal" | "viral" | "bacterial" | "pest" | "unknown"
-        consecutive_alerts: contatore corrente dei rilevamenti malattia consecutivi
-        timestamp: epoch time della decisione
-    """
+    """Azioni decise dall'agente per un ciclo, con la motivazione (reasoning)."""
     actions: list[ActionResult]
     reasoning: list[str]
     disease_category: str
@@ -98,7 +65,6 @@ class AgentDecision:
     timestamp: float = field(default_factory=time.time)
 
     def summary(self) -> str:
-        """Stringa riassuntiva human-readable della decisione."""
         if not self.actions:
             return "Nessuna azione"
         return " | ".join(
@@ -120,26 +86,9 @@ class AgentDecision:
 # Agente Decisionale
 # ══════════════════════════════════════════════════════════════
 class DecisionAgent:
-    """
-    Agente razionale basato su modello per la gestione della serra.
-
-    Mantiene stato interno tra un ciclo e l'altro:
-        - _consecutive_disease_count: quanti cicli consecutivi con malattia
-          (statistica di comportamento, mostrata in dashboard)
-        - _recent_categories: deque delle categorie di malattia recenti
-          (finestra scorrevole, usata per rilevare le epidemie)
-        - _last_predictions: deque degli ultimi N risultati
-        - _action_history: storico delle azioni eseguite
-
-    Le soglie operative sono lette dal config.yaml (sezione "agent").
-    """
+    """Agente razionale basato su modello per la gestione della serra."""
 
     def __init__(self, config: dict, actuators: ActuatorBank):
-        """
-        Args:
-            config: dizionario di configurazione (config.yaml)
-            actuators: banco degli attuatori simulati
-        """
         self.config = config
         self.actuators = actuators
         self._load_thresholds()
@@ -164,7 +113,6 @@ class DecisionAgent:
         )
 
     def _load_thresholds(self) -> None:
-        """Carica le soglie operative dal config.yaml."""
         cfg = self.config.get("agent", {})
         self._conf_threshold = cfg.get("confidence_threshold", 0.70)
         self._humidity_high = cfg.get("humidity_high_threshold", 80.0)
@@ -185,28 +133,7 @@ class DecisionAgent:
         env: EnvironmentReading,
         true_label: Optional[str] = None,
     ) -> AgentDecision:
-        """
-        Esegue il ragionamento condizione → azione per un ciclo.
-
-        Regole in ordine di priorità decrescente:
-            1. Confidenza < soglia → human-in-the-loop (alarm + notifica)
-            2. Malattia virale → alarm CRITICAL (possibile vettore insetto)
-            3. Malattia fungina + umidità alta → ventilazione + notifica
-            4. Malattia batterica/parassita → notifica WARNING
-            5. Soil moisture bassa → irrigazione
-            6. Temperatura alta → ventilazione (indipendente dalla malattia)
-            7. Stessa categoria di malattia frequente nella finestra recente
-               → alarm epidemia
-            8. Healthy → disattiva tutto + notifica OK se si esce da malattia
-
-        Args:
-            inference: risultato dell'inferenza CNN (classe, confidenza, ...)
-            env: lettura dei sensori ambientali
-            true_label: (opzionale) classe reale, per metriche di comportamento
-
-        Returns:
-            AgentDecision con lista di ActionResult e spiegazione del ragionamento
-        """
+        """Esegue il ragionamento condizione → azione per un ciclo."""
         self._total_cycles += 1
         self._last_predictions.append(inference.predicted_label)
 
@@ -215,8 +142,6 @@ class DecisionAgent:
         label = inference.predicted_label
         conf = inference.confidence
 
-        # Classifica la malattia predetta e aggiorna la finestra scorrevole
-        # delle categorie (serve al rilevamento dell'epidemia, Regola 7)
         disease_category = self._classify_disease(label)
         self._recent_categories.append(disease_category)
 
@@ -225,8 +150,9 @@ class DecisionAgent:
         # ══════════════════════════════════════════════════════
         if inference.is_low_confidence(self._conf_threshold):
             reasoning.append(
-                f"Conf={conf:.1%} < soglia={self._conf_threshold:.0%} "
-                f"→ predizione inaffidabile, richiesta ispezione umana"
+                f"Confidenza {conf:.1%} sotto la soglia minima "
+                f"({self._conf_threshold:.0%}): predizione inaffidabile, "
+                f"richiesta ispezione umana"
             )
             actions.append(self.actuators.alarm.activate(
                 f"confidenza modello bassa ({conf:.1%}) su '{label}'"
@@ -236,7 +162,6 @@ class DecisionAgent:
                 f"su immagine classificata come '{label}'",
                 severity="WARNING",
             ))
-            # Anche con bassa confidenza, gestiamo i sensori ambientali
             actions += self._handle_environmental(env, reasoning)
             self._update_consecutive(label, actions, reasoning)
             return self._make_decision(actions, reasoning, disease_category)
@@ -247,8 +172,8 @@ class DecisionAgent:
         if label in VIRAL_DISEASES:
             self._consecutive_disease_count += 1
             reasoning.append(
-                f"Malattia VIRALE rilevata: '{label}' "
-                f"(conf={conf:.1%}) → possibile vettore insetto"
+                f"Rilevata malattia virale ({_friendly_label(label)}, "
+                f"confidenza {conf:.1%}): possibile diffusione tramite insetti"
             )
             actions.append(self.actuators.alarm.activate(
                 f"malattia virale: {label}"
@@ -268,12 +193,14 @@ class DecisionAgent:
         if label in FUNGAL_DISEASES:
             self._consecutive_disease_count += 1
             reasoning.append(
-                f"Malattia FUNGINA: '{label}' (conf={conf:.1%})"
+                f"Rilevata malattia fungina ({_friendly_label(label)}, "
+                f"confidenza {conf:.1%})"
             )
             if env.humidity_pct > self._humidity_high:
                 reasoning.append(
-                    f"Umidità {env.humidity_pct:.1f}% > soglia {self._humidity_high}% "
-                    f"→ condizioni favorevoli alla diffusione → ventilazione attivata"
+                    f"Umidità {env.humidity_pct:.1f}% sopra la soglia "
+                    f"({self._humidity_high}%): condizioni favorevoli alla "
+                    f"diffusione, ventilazione attivata"
                 )
                 actions.append(self.actuators.ventilation.activate(
                     f"malattia fungina '{label}' + umidità alta ({env.humidity_pct:.0f}%)"
@@ -285,8 +212,8 @@ class DecisionAgent:
                 ))
             else:
                 reasoning.append(
-                    f"Umidità {env.humidity_pct:.1f}% nella norma, "
-                    "solo notifica"
+                    f"Umidità {env.humidity_pct:.1f}% nella norma: "
+                    "solo notifica, nessun attuatore azionato"
                 )
                 actions.append(self.actuators.notification.send(
                     f"Malattia fungina rilevata: '{label}' (conf {conf:.1%}). "
@@ -299,10 +226,13 @@ class DecisionAgent:
         # ══════════════════════════════════════════════════════
         elif label in BACTERIAL_DISEASES | PEST_DISEASES:
             self._consecutive_disease_count += 1
-            cat = "BATTERICA" if label in BACTERIAL_DISEASES else "PARASSITA"
-            reasoning.append(f"Malattia {cat}: '{label}' (conf={conf:.1%})")
+            cat = "batterica" if label in BACTERIAL_DISEASES else "da parassiti"
+            reasoning.append(
+                f"Rilevata malattia {cat} ({_friendly_label(label)}, "
+                f"confidenza {conf:.1%})"
+            )
             actions.append(self.actuators.notification.send(
-                f"Malattia {cat.lower()} rilevata: '{label}' (conf {conf:.1%}). "
+                f"Malattia {cat} rilevata: '{label}' (conf {conf:.1%}). "
                 "Valutare trattamento specifico.",
                 severity="WARNING",
             ))
@@ -313,8 +243,8 @@ class DecisionAgent:
         elif label == HEALTHY_CLASS:
             if self._consecutive_disease_count > 0:
                 reasoning.append(
-                    f"Pianta SANA dopo {self._consecutive_disease_count} "
-                    "rilevamenti malattia → reset attuatori"
+                    f"Pianta tornata sana dopo {self._consecutive_disease_count} "
+                    "rilevamenti di malattia: attuatori di emergenza disattivati"
                 )
                 actions.append(self.actuators.alarm.deactivate("pianta tornata sana"))
                 actions.append(self.actuators.ventilation.deactivate("pianta sana"))
@@ -323,7 +253,9 @@ class DecisionAgent:
                     severity="INFO",
                 ))
             else:
-                reasoning.append(f"Pianta SANA (conf={conf:.1%}) → nessuna azione")
+                reasoning.append(
+                    f"Pianta sana (confidenza {conf:.1%}): nessuna azione richiesta"
+                )
             self._consecutive_disease_count = 0
 
         # ══════════════════════════════════════════════════════
@@ -338,9 +270,9 @@ class DecisionAgent:
         epidemic_cat, epidemic_count = self._detect_epidemic()
         if epidemic_cat is not None:
             reasoning.append(
-                f"{epidemic_count}/{len(self._recent_categories)} scansioni "
-                f"recenti sono di categoria '{epidemic_cat}' "
-                f"(soglia={self._epidemic_min_count}) → ALLARME EPIDEMIA"
+                f"Allarme epidemia: {epidemic_count} scansioni su "
+                f"{len(self._recent_categories)} recenti sono di categoria "
+                f"'{epidemic_cat}' (soglia: {self._epidemic_min_count})"
             )
             actions.append(self.actuators.alarm.activate(
                 f"epidemia '{epidemic_cat}': {epidemic_count} rilevamenti "
@@ -353,7 +285,6 @@ class DecisionAgent:
                 severity="CRITICAL",
             ))
 
-        # Aggiorna metriche di comportamento
         if true_label is not None:
             is_correct = (label == true_label) or (
                 label in FUNGAL_DISEASES and true_label in FUNGAL_DISEASES
@@ -374,17 +305,13 @@ class DecisionAgent:
         env: EnvironmentReading,
         reasoning: list[str],
     ) -> list[ActionResult]:
-        """
-        Gestisce le condizioni ambientali indipendentemente dalla diagnosi CNN.
-
-        Controlla: soil moisture, temperatura, luminosità.
-        """
+        """Gestisce le condizioni ambientali indipendentemente dalla diagnosi CNN."""
         actions = []
 
         if env.soil_moisture_pct < self._soil_low:
             reasoning.append(
-                f"Soil moisture {env.soil_moisture_pct:.1f}% < "
-                f"soglia {self._soil_low}% → irrigazione attivata"
+                f"Umidità del suolo {env.soil_moisture_pct:.1f}% sotto la "
+                f"soglia ({self._soil_low}%): irrigazione attivata"
             )
             actions.append(self.actuators.irrigation.activate(
                 f"umidità suolo bassa ({env.soil_moisture_pct:.0f}%)"
@@ -392,8 +319,8 @@ class DecisionAgent:
         else:
             if self.actuators.irrigation.is_active:
                 reasoning.append(
-                    f"Soil moisture {env.soil_moisture_pct:.1f}% nella norma "
-                    "→ irrigazione disattivata"
+                    f"Umidità del suolo {env.soil_moisture_pct:.1f}% tornata "
+                    "nella norma: irrigazione disattivata"
                 )
                 actions.append(self.actuators.irrigation.deactivate(
                     f"umidità suolo {env.soil_moisture_pct:.0f}% nella norma"
@@ -401,8 +328,8 @@ class DecisionAgent:
 
         if env.temperature_c > self._temp_high:
             reasoning.append(
-                f"Temperatura {env.temperature_c:.1f}°C > "
-                f"soglia {self._temp_high}°C → ventilazione attivata"
+                f"Temperatura {env.temperature_c:.1f}°C sopra la soglia "
+                f"({self._temp_high}°C): ventilazione attivata"
             )
             actions.append(self.actuators.ventilation.activate(
                 f"temperatura alta ({env.temperature_c:.1f}°C)"
@@ -410,8 +337,8 @@ class DecisionAgent:
 
         if env.temperature_c < self._temp_low:
             reasoning.append(
-                f"Temperatura {env.temperature_c:.1f}°C < "
-                f"soglia {self._temp_low}°C → alert freddo"
+                f"Temperatura {env.temperature_c:.1f}°C sotto la soglia "
+                f"({self._temp_low}°C): possibile guasto al riscaldamento"
             )
             actions.append(self.actuators.notification.send(
                 f"Temperatura troppo bassa: {env.temperature_c:.1f}°C. "
@@ -421,8 +348,8 @@ class DecisionAgent:
 
         if env.light_lux < self._light_low:
             reasoning.append(
-                f"Luminosità {env.light_lux:.0f} lux < "
-                f"soglia {self._light_low:.0f} lux → alert luce"
+                f"Luminosità {env.light_lux:.0f} lux sotto la soglia "
+                f"({self._light_low:.0f} lux): illuminazione insufficiente"
             )
             actions.append(self.actuators.notification.send(
                 f"Luminosità scarsa: {env.light_lux:.0f} lux. "
@@ -433,21 +360,8 @@ class DecisionAgent:
         return actions
 
     def _detect_epidemic(self) -> tuple[Optional[str], int]:
-        """
-        Rileva un'epidemia come alta frequenza della STESSA categoria di
-        malattia nella finestra scorrevole delle ultime scansioni.
-
-        A differenza di un semplice contatore di malattie consecutive (che
-        scatterebbe anche su patologie diverse e scorrelate rilevate di
-        seguito), questo approccio riflette il concetto reale di epidemia --
-        il focolaio di UNA specifica patologia -- ed è più robusto: tollera
-        errori isolati del modello e il campionamento casuale di piante
-        diverse ad ogni ciclo.
-
-        Returns:
-            (categoria, conteggio) se una categoria di malattia raggiunge la
-            soglia nella finestra, altrimenti (None, 0).
-        """
+        """Rileva un'epidemia come alta frequenza della STESSA categoria di
+        malattia nella finestra scorrevole delle ultime scansioni."""
         disease_cats = [
             c for c in self._recent_categories
             if c not in ("healthy", "unknown")
@@ -465,9 +379,6 @@ class DecisionAgent:
         actions: list,
         reasoning: list,
     ) -> None:
-        """Aggiorna il contatore dei rilevamenti consecutivi (statistica
-        mostrata in dashboard; il rilevamento epidemia usa invece
-        _detect_epidemic)."""
         if label != HEALTHY_CLASS:
             self._consecutive_disease_count += 1
         else:
@@ -475,7 +386,6 @@ class DecisionAgent:
 
     @staticmethod
     def _classify_disease(label: str) -> str:
-        """Restituisce la categoria della malattia."""
         if label == HEALTHY_CLASS:
             return "healthy"
         if label in FUNGAL_DISEASES:
@@ -494,7 +404,6 @@ class DecisionAgent:
         reasoning: list[str],
         disease_category: str,
     ) -> AgentDecision:
-        """Factory per AgentDecision."""
         return AgentDecision(
             actions=actions,
             reasoning=reasoning,
@@ -507,7 +416,6 @@ class DecisionAgent:
     # ─────────────────────────────────────────────────────────────
 
     def get_stats(self) -> dict:
-        """Restituisce le statistiche di comportamento dell'agente."""
         return {
             "total_cycles": self._total_cycles,
             "consecutive_disease_count": self._consecutive_disease_count,

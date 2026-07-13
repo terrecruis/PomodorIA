@@ -1,22 +1,7 @@
-"""
-sensors/environment_simulator.py — Environmental Sensor Simulator (IoTWF Livello 1)
+"""sensors/environment_simulator.py — Environmental Sensor Simulator (IoTWF Livello 1).
 
-Simula i sensori ambientali della serra:
-- Temperatura (°C) → come un DHT22
-- Umidità relativa (%) → come un DHT22
-- Umidità del suolo (%) → come un igrometro capacitivo
-- Luminosità (lux) → come un BH1750
-
-I valori NON sono puramente casuali: sono **correlati euristicamente
-alla patologia rilevata dalla fotocamera**, implementando il concetto
-di Data Fusion (§3.1 del doc di progetto).
-
-Correlazioni botaniche reali usate nella simulazione:
-- Malattie fungine (Early/Late blight, Leaf Mold, Septoria)
-  → umidità alta, temperatura moderata, scarsa ventilazione
-- Acari (Spider mites) → ambiente secco, caldo
-- Malattie virali (TYLCV, Mosaic) → temperature varie, vettori insetti
-- Pianta sana → condizioni ottimali
+I valori NON sono puramente casuali: sono correlati euristicamente alla
+patologia rilevata dalla fotocamera, implementando il concetto di Data Fusion.
 """
 
 import random
@@ -55,11 +40,7 @@ class EnvironmentReading:
 # ══════════════════════════════════════════════════════════════
 @dataclass
 class SensorReading:
-    """
-    Lettura completa di un ciclo sense: combina lo scatto della
-    fotocamera con i dati ambientali. Questa è la struttura che
-    viene passata all'Edge AI Layer e poi all'Agente Decisionale.
-    """
+    """Lettura completa di un ciclo sense: fotocamera + dati ambientali."""
     timestamp: float
     image_path: str
     true_label: str # ground truth dal dataset (per validazione PoC)
@@ -164,27 +145,10 @@ _DISEASE_PROFILES: Dict[str, Dict[str, Tuple[float, float]]] = {
 # Environment Sensor Simulator
 # ══════════════════════════════════════════════════════════════
 class EnvironmentSensorSimulator:
-    """
-    Simula i sensori ambientali della serra (DHT22, igrometro, luxmetro).
-
-    I valori generati sono correlati alla patologia osservata dalla
-    fotocamera (Data Fusion), rendendo la simulazione plausibile
-    e coerente per l'agente decisionale.
-
-    Parametri (letti dal config):
-    - sensors.temperature: range e rumore
-    - sensors.humidity: range e rumore
-    - sensors.soil_moisture: range e rumore
-    - sensors.light: range e rumore
-    """
+    """Simula i sensori ambientali della serra (DHT22, igrometro, luxmetro),
+    correlati alla patologia osservata dalla fotocamera (Data Fusion)."""
 
     def __init__(self, config: dict):
-        """
-        Inizializza il simulatore con i parametri dal config.
-
-        Args:
-            config: dizionario di configurazione (config.yaml caricato)
-        """
         self.sensor_config = config["sensors"]
 
         # Range di clamp per evitare valori fisicamente impossibili
@@ -200,20 +164,8 @@ class EnvironmentSensorSimulator:
         print("EnvironmentSensorSimulator inizializzato")
 
     def read(self, disease_label: Optional[str] = None) -> EnvironmentReading:
-        """
-        Genera una lettura dei sensori ambientali.
-
-        Se disease_label è fornito, i valori sono correlati
-        alla patologia (Data Fusion). Altrimenti usa range
-        generici dal config.
-
-        Args:
-            disease_label: nome della patologia rilevata dalla camera
-                          (es. "Tomato___Early_blight"), o None per valori generici
-
-        Returns:
-            EnvironmentReading con i valori dei 4 sensori
-        """
+        """Se disease_label è fornito, i valori sono correlati alla patologia
+        (Data Fusion); altrimenti usa i range generici dal config."""
         if disease_label and disease_label in _DISEASE_PROFILES:
             reading = self._generate_correlated(disease_label)
         else:
@@ -223,10 +175,6 @@ class EnvironmentSensorSimulator:
         return reading
 
     def _generate_correlated(self, disease_label: str) -> EnvironmentReading:
-        """
-        Genera valori correlati al profilo della patologia.
-        Aggiunge un leggero rumore gaussiano per variabilità realistica.
-        """
         profile = _DISEASE_PROFILES[disease_label]
 
         values = {}
@@ -245,10 +193,6 @@ class EnvironmentSensorSimulator:
         )
 
     def _generate_generic(self) -> EnvironmentReading:
-        """
-        Genera valori dai range generici definiti nel config.yaml,
-        senza correlazione con alcuna patologia.
-        """
         cfg = self.sensor_config
 
         temp = np.random.uniform(

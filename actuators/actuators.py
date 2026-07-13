@@ -1,21 +1,8 @@
-"""
-actuators/actuators.py — Actuator Layer (IoTWF Livello 1, lato output)
+"""actuators/actuators.py — Actuator Layer (IoTWF Livello 1, lato output).
 
-Ogni attuatore è una classe con metodi activate()/deactivate() che,
-invece di azionare pin GPIO reali, logga l'azione tramite FakeGPIO.
-
-Il codice è strutturato per essere "drop-in replaceable" su hardware
-reale: basta sostituire `from actuators.fake_gpio import ...` con
-`import RPi.GPIO as GPIO` senza modificare la logica degli attuatori.
-
-Attuatori simulati:
-    IrrigationActuator — pompa dell'acqua (GPIO pin 17)
-    VentilationActuator — ventola di areazione (GPIO pin 27)
-    AlarmActuator — LED/buzzer di allarme (GPIO pin 22)
-    NotificationActuator — log testuale notifica all'agricoltore
-
-ActionResult: dataclass restituita da ogni activate(), contiene
-    il tipo di azione, il motivo e il timestamp.
+Ogni attuatore logga l'azione tramite FakeGPIO invece di azionare pin reali:
+basta sostituire `from actuators.fake_gpio import ...` con `import RPi.GPIO
+as GPIO` per portare il codice su hardware reale senza altre modifiche.
 """
 
 import logging
@@ -50,12 +37,7 @@ class ActionResult:
 # Classe base attuatore
 # ══════════════════════════════════════════════════════════════
 class SimulatedActuator:
-    """
-    Classe base per tutti gli attuatori simulati.
-
-    Gestisce lo stato (attivo/non attivo) e il logging.
-    Sottoclassi devono definire `name` e `pin`.
-    """
+    """Classe base per gli attuatori simulati. Sottoclassi definiscono `name` e `pin`."""
 
     name: str = "GenericActuator"
     pin: int = 0
@@ -70,15 +52,6 @@ class SimulatedActuator:
         return self._active
 
     def activate(self, reason: str = "") -> ActionResult:
-        """
-        Attiva l'attuatore (porta il pin a HIGH).
-
-        Args:
-            reason: descrizione human-readable del motivo dell'attivazione
-
-        Returns:
-            ActionResult con i dettagli dell'azione
-        """
         if not self._active:
             GPIO.output(self.pin, GPIO.HIGH)
             self._active = True
@@ -95,15 +68,6 @@ class SimulatedActuator:
         )
 
     def deactivate(self, reason: str = "condizioni rientrate nella norma") -> ActionResult:
-        """
-        Disattiva l'attuatore (porta il pin a LOW).
-
-        Args:
-            reason: descrizione del motivo della disattivazione
-
-        Returns:
-            ActionResult con i dettagli dell'azione
-        """
         if self._active:
             GPIO.output(self.pin, GPIO.LOW)
             self._active = False
@@ -135,70 +99,32 @@ class SimulatedActuator:
 # ══════════════════════════════════════════════════════════════
 
 class IrrigationActuator(SimulatedActuator):
-    """
-    Pompa di irrigazione.
-
-    Si attiva quando la soil moisture scende sotto la soglia
-    o quando la CNN rileva una malattia che richiede idratazione controllata.
-
-    Pin GPIO: 17 (BCM)
-    """
+    """Pompa di irrigazione (GPIO 17)."""
     name = "IrrigationActuator"
     pin = 17
 
 
 class VentilationActuator(SimulatedActuator):
-    """
-    Ventola di areazione.
-
-    Si attiva quando:
-    - temperatura troppo alta
-    - umidità alta + malattia fungina rilevata (Early/Late blight)
-
-    Pin GPIO: 27 (BCM)
-    """
+    """Ventola di areazione (GPIO 27)."""
     name = "VentilationActuator"
     pin = 27
 
 
 class AlarmActuator(SimulatedActuator):
-    """
-    LED/buzzer di allarme.
-
-    Si attiva per segnalare:
-    - N rilevamenti consecutivi di malattia (epidemia simulata)
-    - Confidenza modello sotto soglia → richiesta ispezione umana
-    - Rilevamento malattia virale (vettore insetto → alta urgenza)
-
-    Pin GPIO: 22 (BCM)
-    """
+    """LED/buzzer di allarme (GPIO 22)."""
     name = "AlarmActuator"
     pin = 22
 
 
 class NotificationActuator:
-    """
-    Notifica testuale all'agricoltore (IoTWF Livello 7 — Collaboration).
-
-    Non ha pin GPIO (è un'azione software). Simula l'invio di una
-    notifica push/SMS/email loggando il messaggio con alta visibilità.
-    """
+    """Notifica testuale all'agricoltore (IoTWF Livello 7 — Collaboration).
+    Non ha pin GPIO: è un'azione puramente software."""
     name = "NotificationActuator"
 
     def __init__(self):
         self._notifications_sent: int = 0
 
     def send(self, message: str, severity: str = "INFO") -> ActionResult:
-        """
-        Invia una notifica (simulata) all'agricoltore.
-
-        Args:
-            message: testo della notifica
-            severity: "INFO" | "WARNING" | "CRITICAL"
-
-        Returns:
-            ActionResult con il messaggio inviato
-        """
         self._notifications_sent += 1
 
         msg = f"NOTIFICA [{severity}] → {message}"
@@ -223,12 +149,7 @@ class NotificationActuator:
 # Registro centralizzato degli attuatori
 # ══════════════════════════════════════════════════════════════
 class ActuatorBank:
-    """
-    Gestisce tutti gli attuatori del sistema in un unico oggetto.
-
-    Fornisce metodi di utilità per resettare tutti gli attuatori
-    e recuperare lo stato complessivo del sistema.
-    """
+    """Gestisce tutti gli attuatori del sistema in un unico oggetto."""
 
     def __init__(self):
         self.irrigation = IrrigationActuator()

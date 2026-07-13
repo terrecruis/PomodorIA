@@ -1,49 +1,17 @@
-"""
-scripts/extract_test_set.py — Estrazione del test set "vero" (holdout 20%)
+"""scripts/extract_test_set.py — Estrazione del test set "vero" (holdout 20%).
 
-Problema che risolve
----------------------
-Il progetto ML originale (CNN---TOMATO-) ha addestrato la CNN con uno
-split Holdout 80/20 fatto così (dataset.py::get_train_test_split):
+La VirtualCameraSensor pesca da tutto il dataset (train+test): senza questo
+script la CNN si troverebbe a classificare immagini già viste in training
+(accuracy ~100% fasulla). Lo script riproduce lo stesso ImageFolder + filtro
+"Tomato" + random_split(seed=42) del progetto di training originale, per
+estrarre lo stesso 20% di test set in una cartella dedicata.
 
-    train_size = int(0.8 * len(dataset))
-    test_size = len(dataset) - train_size
-    train_data, test_data = random_split(
-        dataset, [train_size, test_size],
-        generator=torch.Generator().manual_seed(42)
-    )
-
-La VirtualCameraSensor di PomodorIA, però, pesca le immagini da TUTTO
-il dataset (train + test), quindi la CNN si trova spessissimo a
-classificare immagini che ha già visto in training → accuracy ~100%
-fasulla, non rappresentativa delle reali capacità del modello.
-
-Questo script:
-  1. Ricostruisce ESATTAMENTE lo stesso ImageFolder + filtro "Tomato"
-     + random_split(seed=42) del progetto originale (stessa logica di
-     dataset.py::get_dataset + get_train_test_split), così da ottenere
-     lo stesso 20% che era test set nel progetto CNN---TOMATO-.
-  2. Copia (o crea symlink) SOLO quelle immagini in una nuova cartella
-     con la stessa struttura a classi (Tomato___Xxx/immagine.jpg),
-     pronta per essere usata come `dataset_root` in config.yaml.
-  3. Salva anche un manifest CSV (test_set_manifest.csv) con
-     path/classe/indice, utile per audit e per la relazione.
-
-IMPORTANTE: il dataset di origine deve essere ESATTAMENTE la stessa
-copia (stessi file, stesso ordine alfabetico) usata per il training,
-altrimenti random_split(seed=42) non produce lo stesso split. Il modo
-più sicuro è puntare allo stesso path scaricato da kagglehub sulla
-stessa macchina che ha fatto il training.
+IMPORTANTE: il dataset di origine deve essere identico (stessi file, stesso
+ordine) a quello usato per il training, altrimenti il seed non riproduce lo
+stesso split.
 
 Utilizzo:
-    python scripts/extract_test_set.py \\
-        --dataset-root "/Users/utente/.cache/kagglehub/datasets/charuchaudhry/plantvillage-tomato-leaf-dataset/versions/1/plantvillage" \\
-        --output-dir "./plantvillage_testset" \\
-        --mode symlink
-
-    # poi in config.yaml:
-    # paths:
-    # dataset_root: "./plantvillage_testset"
+    python scripts/extract_test_set.py --dataset-root <path> --output-dir ./plantvillage_testset
 """
 
 import argparse
@@ -70,16 +38,8 @@ def find_tomato_folder(root: str) -> str:
 
 
 def build_filtered_dataset(data_dir: str):
-    """
-    Ricostruisce l'ImageFolder e il filtro "solo classi Tomato" esattamente
-    come get_dataset() nel progetto originale, restituendo:
-      - full_dataset: l'ImageFolder completo (serve per risalire ai path)
-      - valid_indices: indici in full_dataset appartenenti a classi Tomato,
-                        NELLO STESSO ORDINE usato per costruire il dataset
-                        filtrato originale (quindi stesso ordine passato
-                        a random_split)
-      - classes: nomi delle classi Tomato, nell'ordine usato dal training
-    """
+    """Ricostruisce l'ImageFolder e il filtro "solo classi Tomato" esattamente
+    come nel progetto di training originale (stesso ordine, per random_split)."""
     data_dir_final = find_tomato_folder(data_dir)
     print(f"Cartella dataset trovata: {data_dir_final}")
 
@@ -97,12 +57,8 @@ def build_filtered_dataset(data_dir: str):
 
 
 def get_test_indices(n_filtered: int, train_ratio: float = 0.8, seed: int = 42):
-    """
-    Riproduce identicamente get_train_test_split(): stesso train_ratio,
-    stesso generator seed 42, sullo stesso numero di elementi del dataset
-    filtrato. Restituisce gli INDICI (nel dataset filtrato, 0..n_filtered-1)
-    che finivano nel test set originale.
-    """
+    """Riproduce lo split originale (stesso train_ratio e seed) per ottenere
+    gli stessi indici che finivano nel test set."""
     train_size = int(train_ratio * n_filtered)
     test_size = n_filtered - train_size
     train_subset, test_subset = random_split(

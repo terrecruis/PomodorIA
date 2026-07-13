@@ -1,19 +1,7 @@
-"""
-sensors/virtual_camera.py — Virtual Camera Sensor (IoTWF Livello 1)
+"""sensors/virtual_camera.py — Virtual Camera Sensor (IoTWF Livello 1).
 
-Simula una fotocamera montata nella serra, pescando immagini reali
-dal dataset PlantVillage-Tomato. Nel PoC sostituisce una fotocamera
-fisica collegata al Raspberry Pi via CSI/USB.
-
-Ogni "scatto" restituisce:
-- L'immagine preprocessata come tensor PyTorch (pronta per la CNN)
-- Il path dell'immagine originale
-- La classe reale (ground truth), per validazione nel PoC
-- Il timestamp dello scatto
-
-Parametro opzionale `bias_class`: forza la simulazione a pescare
-più spesso da una classe specifica (utile per demo mirate,
-es. simulare un'epidemia di Early blight).
+Simula una fotocamera pescando immagini reali dal dataset PlantVillage-Tomato,
+al posto di una fotocamera fisica collegata al Raspberry Pi via CSI/USB.
 """
 
 import os
@@ -44,25 +32,9 @@ class CameraCapture:
 # Virtual Camera Sensor
 # ══════════════════════════════════════════════════════════════
 class VirtualCameraSensor:
-    """
-    Simula una fotocamera nella serra, pescando immagini dal dataset
-    PlantVillage-Tomato.
-
-    Parametri (letti dal config):
-    - dataset_root: percorso alla cartella con le 10 classi
-    - classes: lista ordinata dei nomi delle classi
-    - image_size: dimensione di resize (64x64)
-    - mean/std: normalizzazione ImageNet
-    - bias_class: se impostato, pesca più spesso da quella classe
-    """
+    """Simula una fotocamera nella serra, pescando immagini dal dataset PlantVillage-Tomato."""
 
     def __init__(self, config: dict):
-        """
-        Inizializza il sensore caricando l'indice del dataset.
-
-        Args:
-            config: dizionario di configurazione (config.yaml caricato)
-        """
         self.dataset_root = config["paths"]["dataset_root"]
         self.classes = config["model"]["classes"]
         self.bias_class = config["virtual_camera"].get("bias_class", None)
@@ -86,10 +58,6 @@ class VirtualCameraSensor:
         self.total_captures = 0
 
     def _build_index(self) -> None:
-        """
-        Scansiona il dataset e costruisce un indice in-memory
-        di tutte le immagini disponibili per classe.
-        """
         valid_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
 
         for class_idx, class_name in enumerate(self.classes):
@@ -120,15 +88,8 @@ class VirtualCameraSensor:
             print(f"   Bias attivo verso '{self.bias_class}' ({n_bias} immagini)")
 
     def capture(self) -> CameraCapture:
-        """
-        Esegue uno "scatto" della fotocamera virtuale.
-
-        Se bias_class è impostato, con probabilità 50% pesca da
-        quella classe, altrimenti pesca uniformemente da tutte.
-
-        Returns:
-            CameraCapture con immagine preprocessata e metadati
-        """
+        """Se bias_class è impostato, con probabilità 50% pesca da quella
+        classe, altrimenti pesca uniformemente da tutte."""
         if self.bias_class and random.random() < 0.5:
             images = self._image_index.get(self.bias_class, [])
             if images:
@@ -155,19 +116,7 @@ class VirtualCameraSensor:
         )
 
     def capture_from_class(self, class_name: str) -> CameraCapture:
-        """
-        Esegue uno scatto forzato da una classe specifica.
-        Utile per test e demo mirate.
-
-        Args:
-            class_name: nome esatto della classe (es. "Tomato___Early_blight")
-
-        Returns:
-            CameraCapture dalla classe specificata
-
-        Raises:
-            ValueError: se la classe non esiste o non ha immagini
-        """
+        """Scatto forzato da una classe specifica, per test e demo mirate."""
         images = self._image_index.get(class_name, [])
         if not images:
             available = [c for c, imgs in self._image_index.items() if imgs]

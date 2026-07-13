@@ -5,9 +5,6 @@ Interfaccia Streamlit che esegue lo stesso ciclo sense-think-act-log
 dell'orchestratore da riga di comando (orchestrator/main_loop.py), un
 ciclo per ogni rerun, mostrando in tempo reale diagnosi, ambiente,
 attuatori e metriche aggregate.
-
-Avvio:
-    streamlit run dashboard/app_streamlit.py
 """
 import os
 import sys
@@ -54,8 +51,6 @@ CATEGORY_COLORS = {
 }
 ACCENT = dict(teal="#00d4aa", purple="#7c5cfc", amber="#f5a623", red="#ee5a24")
 
-# Layout comune per i grafici Plotly: tema scuro, sfondo trasparente
-# (si fonde con il tema dell'app impostato in .streamlit/config.toml)
 DARK_LAYOUT = dict(
     template="plotly_dark",
     paper_bgcolor="rgba(0,0,0,0)",
@@ -78,8 +73,6 @@ BIAS_OPTIONS = ["— Random —"] + list(CLASS_LABELS.keys())
 
 st.set_page_config(page_title="PomodorIA · Serra Domotica", page_icon="", layout="wide")
 
-# Piccolo ritocco estetico: nasconde il chrome di Streamlit
-# (il tema scuro/colori vengono da .streamlit/config.toml).
 st.markdown("""
 <style>
 #MainMenu, footer, header {visibility: hidden;}
@@ -87,10 +80,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# Set minimo di icone SVG (stroke-based, stile Heroicons): solo quelle
-# effettivamente usate in dashboard. Il colore dello stroke è passato come
-# parametro, così ogni icona si intona sempre con l'accento della card che
-# la contiene (a differenza delle emoji, che hanno un colore fisso).
+# Set minimo di icone SVG
 _ICONS = {
     "settings": "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
     "gamepad": "M6 12h4m-2-2v4m7-1h.01M17 9h.01M2 15V9a4 4 0 0 1 4-4h12a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4c-1 0-1.5-.5-2-1l-1-1H9l-1 1c-.5.5-1 1-2 1a4 4 0 0 1-4-4z",
@@ -115,8 +105,7 @@ _ICONS = {
 
 
 def icon_svg(name: str, size: int = 20, color: str = "currentColor") -> str:
-    """Icona SVG in linea, colorata secondo il parametro `color` — a
-    differenza delle emoji, il colore si adatta sempre all'accento usato."""
+    """Icona SVG in linea, colorabile via `color` (a differenza delle emoji)."""
     path = _ICONS.get(name, "")
     return (
         f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" '
@@ -126,10 +115,7 @@ def icon_svg(name: str, size: int = 20, color: str = "currentColor") -> str:
 
 
 def metric_card(icon: str, label: str, value: str, color: str = ACCENT["teal"]) -> None:
-    """Card colorata con icona, usata al posto di st.metric per evitare il
-    troncamento del testo ("...") che Streamlit applica nei suoi metric
-    nativi quando lo spazio in colonna è ristretto, e per un impatto
-    visivo più marcato (icona + colore d'accento)."""
+    """Sostituisce st.metric per evitare il troncamento del testo in colonne strette."""
     st.markdown(
         f'<div style="background:rgba(255,255,255,0.03);border:1px solid {color}40;'
         f'border-radius:12px;padding:14px 10px;text-align:center">'
@@ -144,8 +130,6 @@ def metric_card(icon: str, label: str, value: str, color: str = ACCENT["teal"]) 
 
 
 def section_header(icon: str, label: str, color: str = ACCENT["teal"]) -> None:
-    """Titolo di sezione con icona SVG colorata, al posto di st.subheader
-    con emoji (che avrebbero un colore fisso non intonato al tema)."""
     st.markdown(
         f'<div style="display:flex;align-items:center;gap:8px;margin:8px 0 4px">'
         f'{icon_svg(icon, 20, color)}'
@@ -165,7 +149,6 @@ def load_config() -> dict:
 
 
 def init_components(config: dict, mode: str, bias: Optional[str], variant: str) -> None:
-    """Istanzia i 5 componenti di dominio e li salva in session_state."""
     import copy
 
     from actuators.actuators import ActuatorBank
@@ -189,9 +172,11 @@ def init_components(config: dict, mode: str, bias: Optional[str], variant: str) 
     ss.init = True
     ss.cfg_mode, ss.cfg_bias, ss.cfg_variant = mode, bias, variant
 
+    ss.proc = psutil.Process()
+    ss.proc.cpu_percent(interval=None)
+
 
 def run_cycle() -> None:
-    """Esegue un ciclo sense-think-act-log e appende il risultato a ss.cycles."""
     ss = st.session_state
     try:
         capture = ss.camera.capture()
@@ -209,8 +194,8 @@ def run_cycle() -> None:
             "confidence": inference.confidence,
             "probabilities": inference.all_probabilities,
             "latency_ms": inference.inference_time_ms,
-            "ram_mb": psutil.Process().memory_info().rss / 1024 ** 2,
-            "cpu_pct": psutil.cpu_percent(interval=None),
+            "ram_mb": ss.proc.memory_info().rss / 1024 ** 2,
+            "cpu_pct": ss.proc.cpu_percent(interval=None),
             "model_mode": inference.model_mode,
             "temperature": env.temperature_c,
             "humidity": env.humidity_pct,
@@ -371,6 +356,7 @@ def render_sidebar(config: dict) -> tuple[float, int]:
                     with st.spinner("Inizializzazione..."):
                         init_components(config, mode, bias, variant)
                 ss.running, ss.interval, ss.max_cycles = True, interval, max_cycles
+                ss.next_cycle_at = 0.0  # esegue subito il primo ciclo
                 st.rerun()
         elif st.button("Ferma", use_container_width=True):
             ss.running = False
@@ -378,6 +364,7 @@ def render_sidebar(config: dict) -> tuple[float, int]:
 
         if ss.get("init") and st.button("Reset sessione", use_container_width=True):
             ss.running, ss.cycles = False, []
+            ss.next_cycle_at = 0.0
             ss.actuators.deactivate_all("reset")
             st.rerun()
 
@@ -385,17 +372,18 @@ def render_sidebar(config: dict) -> tuple[float, int]:
             st.error(f"Errore: {ss.error}")
 
         st.divider()
-        section_header("server", "Simulazione Raspberry Pi", ACCENT["purple"])
+        section_header("server", "Vincoli Edge simulati", ACCENT["purple"])
         engine = ss.get("engine")
+        cycles = ss.get("cycles", [])
+        model_size = f"{engine.get_model_size_mb():.1f} MB" if engine else "—"
+        avg_latency = f"{sum(c['latency_ms'] for c in cycles) / len(cycles):.1f} ms" if cycles else "—"
         sc1, sc2 = st.columns(2)
         with sc1:
-            metric_card("cpu", "CPU", f"{psutil.cpu_percent(interval=None):.0f} %", ACCENT["purple"])
+            metric_card("database", "Modello", model_size, ACCENT["teal"])
         with sc2:
-            metric_card("database", "RAM", f"{psutil.Process().memory_info().rss / 1024**2:.0f} MB", ACCENT["teal"])
-        st.caption(f"Thread: {torch.get_num_threads()} / {psutil.cpu_count()} core · CPU only")
-        #if engine:
-        #    st.caption(f"Modello caricato: **{MODE_LABELS.get(engine.loaded_variant, engine.loaded_variant)}** "
-        #               f"({engine.get_model_size_mb():.1f} MB)")
+            metric_card("zap", "Latenza media", avg_latency, ACCENT["purple"])
+        st.caption(f"Thread: {torch.get_num_threads()} / {psutil.cpu_count()} core · CPU only "
+                   f"(vincolo simulato di un Raspberry Pi, non è hardware reale)")
 
     return interval, max_cycles
 
@@ -466,16 +454,16 @@ def render_actuators(ss, latest: Optional[dict]) -> None:
                         ACCENT["teal"] if active else "#5a5f68")
 
     if latest and latest["reasoning"]:
-        st.caption("Ragionamento dell'agente:")
-        for line in latest["reasoning"][:4]:
-            st.write(f"- {line}")
+        st.caption("Perché l'agente ha agito così in questo ciclo:")
+        for i, line in enumerate(latest["reasoning"], start=1):
+            st.write(f"{i}. {line}")
 
 
 def render_system_monitor(latest: Optional[dict]) -> None:
     section_header("cpu", "System Monitor")
     c1, c2, c3 = st.columns(3)
     with c1:
-        metric_card("cpu", "CPU", f"{latest['cpu_pct']:.0f} %" if latest else "—", ACCENT["purple"])
+        metric_card("cpu", "CPU (processo)", f"{latest['cpu_pct']:.0f} %" if latest else "—", ACCENT["purple"])
     with c2:
         metric_card("database", "RAM", f"{latest['ram_mb']:.0f} MB" if latest else "—", ACCENT["teal"])
     with c3:
@@ -565,7 +553,8 @@ def render_main(config: dict) -> None:
 def main() -> None:
     config = load_config()
     for key, default in [("running", False), ("cycles", []), ("init", False),
-                          ("error", None), ("interval", 1.0), ("max_cycles", 50)]:
+                          ("error", None), ("interval", 1.0), ("max_cycles", 50),
+                          ("next_cycle_at", 0.0)]:
         st.session_state.setdefault(key, default)
 
     interval, max_cycles = render_sidebar(config)
@@ -577,9 +566,11 @@ def main() -> None:
             ss.running = False
             st.rerun()
         else:
-            run_cycle()
-            if ss.get("interval", 1.0) > 0:
-                time.sleep(ss.interval)
+            now = time.time()
+            if now >= ss.next_cycle_at:
+                run_cycle()
+                ss.next_cycle_at = now + ss.get("interval", 1.0)
+            time.sleep(0.15)
             st.rerun()
 
 
