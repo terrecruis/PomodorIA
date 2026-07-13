@@ -349,15 +349,16 @@ Assicurati di avere Python 3.10+ installato sul tuo sistema. Per configurare l'a
 cd PomodorIA
 
 # 2. Crea un virtual environment (raccomandato)
-python3 -m venv .venv
+python3 -m venv venv
 
 # 3. Attiva l'ambiente virtuale
 # Su macOS / Linux:
-source .venv/bin/activate
+source venv/bin/activate
 # Su Windows:
-# .venv\Scripts\activate
+# venv\Scripts\activate
 
 # 4. Installa le dipendenze richieste (PyTorch, Streamlit, Plotly, ecc.)
+pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
@@ -400,6 +401,50 @@ Il comando aprirà automaticamente nel tuo browser la dashboard all'indirizzo **
 - Monitorare i sensori ambientali in tempo reale (temperatura, umidità suolo/aria, luminosità);
 - Verificare il ragionamento dell'agente PEAS e lo scatto degli attuatori virtuali (irrigazione, ventola, allarmi);
 - Consultare il System Monitor per misurare latenza di inferenza, consumo RAM e utilizzo CPU (su 1 thread, come su Raspberry Pi).
+
+> ⚠️ **Attenzione**: `config.yaml` viene letto una sola volta all'avvio del
+> processo Streamlit e tenuto in cache per tutta la sua durata. Ogni modifica
+> al file richiede l'arresto (`CTRL+C`) e il riavvio di `streamlit run`: un
+> semplice refresh della pagina nel browser **non** basta.
+
+### 6.4 Generazione dei modelli compressi (opzionale)
+
+Necessario solo per usare la modalità `optimized` (pruning/quantizzazione) o
+per visualizzare i grafici di confronto fra le varianti compresse nella
+dashboard:
+
+```bash
+python models/compress.py
+# oppure con una sparsità di pruning diversa dal 30% predefinito:
+python models/compress.py --sparsity 0.5
+```
+
+Al termine, `models/optimized/` conterrà le tre varianti compresse (vedi §4)
+e `benchmarks/benchmark_results.csv` verrà aggiornato con le relative
+metriche.
+
+### 6.5 Esecuzione da riga di comando
+
+In alternativa alla dashboard, il ciclo `sense → think → act → log` può
+essere eseguito da terminale, registrando ogni ciclo su file CSV
+(`logs/run_*.csv`) invece che mostrarlo in un'interfaccia grafica:
+
+```bash
+# Esecuzione base, 50 cicli
+python orchestrator/main_loop.py --cycles 50 --interval 2
+
+# Forzare una classe specifica (demo mirata, es. simulare un'epidemia)
+python orchestrator/main_loop.py --class Tomato___Early_blight --cycles 20
+
+# Selezionare esplicitamente modalità e variante del modello
+python orchestrator/main_loop.py --mode optimized --variant onnx --cycles 100
+
+# Esecuzione infinita (fino a CTRL+C), output minimo
+python orchestrator/main_loop.py --cycles 0 --quiet
+```
+
+Il file di log generato può essere analizzato con strumenti standard per
+l'analisi tabellare (es. `pandas`, o un foglio di calcolo).
 
 ---
 
