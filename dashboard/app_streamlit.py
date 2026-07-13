@@ -393,9 +393,9 @@ def render_sidebar(config: dict) -> tuple[float, int]:
         with sc2:
             metric_card("database", "RAM", f"{psutil.Process().memory_info().rss / 1024**2:.0f} MB", ACCENT["teal"])
         st.caption(f"Thread: {torch.get_num_threads()} / {psutil.cpu_count()} core · CPU only")
-        if engine:
-            st.caption(f"Modello caricato: **{MODE_LABELS.get(engine.loaded_variant, engine.loaded_variant)}** "
-                       f"({engine.get_model_size_mb():.1f} MB)")
+        #if engine:
+        #    st.caption(f"Modello caricato: **{MODE_LABELS.get(engine.loaded_variant, engine.loaded_variant)}** "
+        #               f"({engine.get_model_size_mb():.1f} MB)")
 
     return interval, max_cycles
 
