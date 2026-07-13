@@ -5,8 +5,8 @@ Questa sezione fornisce le istruzioni operative per eseguire il progetto.
 L'archivio consegnato include già tutto il necessario per l'esecuzione
 immediata: il checkpoint della rete allenata
 (\texttt{models/CNN\_64f-k3-3blk.pth}) e il sottoinsieme di test già
-estratto (\texttt{plantvillage\_testset/}, Sezione~\ref{sec:moduli}) --
-senza questi due elementi non sarebbe possibile eseguire un'inferenza
+estratto (\texttt{plantvillage\_testset/}, Sezione~\ref{sec:moduli}).
+Senza questi due elementi non sarebbe possibile eseguire un'inferenza
 sensata: il primo perché il training della rete richiede ore su GPU e non è
 lo scopo di questo progetto, il secondo perché senza di esso la fotocamera
 virtuale pescherebbe anche immagini già viste in addestramento, mostrando
@@ -79,7 +79,7 @@ verrà aggiornato con le relative metriche.
 
 Le due modalità (Sezione~\ref{sec:moduli}) rispondono a esigenze diverse: in
 un deployment reale, il Raspberry Pi nella serra girerebbe senza schermo,
-scrivendo solo un log -- lo scenario riprodotto dall'esecuzione da riga di
+scrivendo solo un log, cioè lo scenario riprodotto dall'esecuzione da riga di
 comando; la dashboard, invece, rappresenta uno strumento di supervisione
 che un operatore userebbe per ispezionare il sistema da remoto o durante
 una demo, non qualcosa che girerebbe stabilmente sul dispositivo stesso.

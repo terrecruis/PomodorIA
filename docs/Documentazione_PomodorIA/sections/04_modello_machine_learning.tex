@@ -26,7 +26,7 @@ formato float32). L'architettura è composta da:
     \item un \textbf{classificatore} completamente connesso
     (\texttt{Linear} $\to$ \texttt{ReLU} $\to$ \texttt{Dropout} $\to$
     \texttt{Linear}) che produce 10 valori grezzi (\emph{logits}), uno per
-    classe, la loro trasformazione in probabilità (softmax) è applicata
+    classe. La loro trasformazione in probabilità (softmax) è applicata
     dal motore di inferenza, descritto nella Sezione~\ref{sec:edge-layer}.
 \end{itemize}
 

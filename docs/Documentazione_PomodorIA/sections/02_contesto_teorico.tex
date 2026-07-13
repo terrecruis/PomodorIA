@@ -13,21 +13,21 @@ una pipeline che va dal dispositivo fisico fino ai processi di
 collaborazione con l'utente finale:
 
 \begin{enumerate}
-    \item \textbf{Physical Devices \& Controllers}: i dispositivi fisici
+    \item \textbf{Physical Devices \& Controllers}: I dispositivi fisici
     (sensori, attuatori) che percepiscono e agiscono sul mondo reale.
-    \item \textbf{Connectivity}: l'infrastruttura di comunicazione tra i
+    \item \textbf{Connectivity}: L'infrastruttura di comunicazione tra i
     dispositivi e il resto del sistema.
-    \item \textbf{Edge (Fog) Computing}\footnote{\emph{Fog Computing}: un'estensione
+    \item \textbf{Edge (Fog) Computing}\footnote{\emph{Fog Computing}: Un'estensione
     del paradigma Edge Computing, in cui l'elaborazione dei dati avviene su
     nodi intermedi distribuiti fra il dispositivo e il cloud, non
-    necessariamente sul dispositivo stesso~\ref{bib:fog}.}: l'elaborazione
-    dei dati vicino alla fonte, per ridurre latenza e dipendenza dal cloud.
-    \item \textbf{Data Accumulation}: la persistenza dei dati raccolti.
-    \item \textbf{Data Abstraction}: la normalizzazione e strutturazione
+    necessariamente sul dispositivo stesso~\ref{bib:fog}.} L'elaborazione
+ dei dati avviene vicino alla fonte, per ridurre latenza e dipendenza dal cloud.
+    \item \textbf{Data Accumulation}:  la persistenza dei dati raccolti.
+    \item \textbf{Data Abstraction}: La normalizzazione e strutturazione
     dei dati per renderli utilizzabili dal livello applicativo.
-    \item \textbf{Application}: la logica applicativa e le interfacce che
+    \item \textbf{Application}: La logica applicativa e le interfacce che
     rendono il sistema utilizzabile.
-    \item \textbf{Collaboration \& Processes}: l'integrazione con i
+    \item \textbf{Collaboration \& Processes}: L'integrazione con i
     processi umani e organizzativi (notifiche, decisioni condivise).
 \end{enumerate}
 
@@ -67,7 +67,7 @@ La \textbf{Data Fusion}~\ref{bib:datafusion} è la combinazione di dati
 provenienti da fonti eterogenee. Nel caso di PomodorIA, un'immagine e una
 serie di letture ambientali numeriche sono riunite in un'unica rappresentazione
 coerente, per prendere decisioni più robuste di quelle ottenibili da una
-singola fonte isolata. Nel progetto questo principio è implementato
+singola fonte isolata. Nel progetto, questo principio è implementato
 correlando statisticamente i valori ambientali simulati alla patologia
 rilevata nell'immagine (Sezione~\ref{sec:moduli}), cosicché l'agente
 decisionale possa ragionare su informazioni coerenti, ad esempio
