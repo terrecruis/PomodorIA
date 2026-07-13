@@ -4,10 +4,12 @@
 \subsection{Origine, dataset e scelta architetturale}
 
 Il modello di riconoscimento utilizzato in PomodorIA non è stato addestrato
-da zero nell'ambito di questo progetto, ma proviene da un esame
+da zero nell'ambito di questo progetto, ma proviene, come già detto, da un esame
 precedente~\ref{bib:cnntomato}: una rete convoluzionale (CNN) allenata sul
-dataset \textbf{PlantVillage -- Tomato}~\ref{bib:dataset} (14.529 immagini,
-10 classi: 9 patologie fogliari più la classe "sana").
+dataset \textbf{PlantVillage -- Tomato}~\ref{bib:dataset}, il sottoinsieme
+di sole immagini di pomodoro estratto dal più ampio dataset PlantVillage
+(che copre invece decine di colture diverse), composto da 14.529 immagini
+suddivise in 10 classi: 9 patologie fogliari più la classe "sana".
 
 \subsection{Architettura della CNN: \texttt{TomatoCNN}}
 
@@ -24,7 +26,7 @@ formato float32). L'architettura è composta da:
     \item un \textbf{classificatore} completamente connesso
     (\texttt{Linear} $\to$ \texttt{ReLU} $\to$ \texttt{Dropout} $\to$
     \texttt{Linear}) che produce 10 valori grezzi (\emph{logits}), uno per
-    classe -- la loro trasformazione in probabilità (softmax) è applicata
+    classe, la loro trasformazione in probabilità (softmax) è applicata
     dal motore di inferenza, descritto nella Sezione~\ref{sec:edge-layer}.
 \end{itemize}
 
@@ -33,6 +35,6 @@ formato float32). L'architettura è composta da:
 Ogni immagine, prima di essere passata alla rete, viene ridimensionata a
 $64\times64$ pixel RGB e normalizzata con media e deviazione standard
 tipiche del dataset ImageNet ($\text{mean}=[0.485, 0.456, 0.406]$,
-$\text{std}=[0.229, 0.224, 0.225]$) -- la stessa pipeline usata in fase di
+$\text{std}=[0.229, 0.224, 0.225]$), cioè la stessa pipeline usata in fase di
 addestramento, condizione necessaria perché la rete funzioni correttamente
 in inferenza.

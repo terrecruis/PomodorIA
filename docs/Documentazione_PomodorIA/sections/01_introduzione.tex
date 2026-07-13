@@ -57,11 +57,19 @@ monitoraggio.
 Il progetto è dichiaratamente un \emph{Proof of Concept} privo di hardware
 fisico: non vengono utilizzati un Raspberry Pi reale, una fotocamera reale,
 né sensori ambientali reali. La scelta permette di riprodurre in modo
-controllato e ripetibile scenari altrimenti difficili da ottenere con
-hardware reale (un'epidemia di una specifica patologia, condizioni
-ambientali estreme), restando comunque focalizzata sugli stessi problemi
-tecnici di un vero sistema Edge AI: gestione delle risorse limitate,
-compressione dei modelli, integrazione sensori-attuatori-agente.
+controllato e ripetibile scenari che, in un impianto reale, richiederebbero
+il verificarsi spontaneo di condizioni specifiche (un'epidemia di una
+particolare patologia, condizioni ambientali estreme) e la disponibilità
+di tutto l'apparato hardware per osservarle. Il PoC resta comunque
+focalizzato sugli stessi problemi tecnici di un vero sistema Edge AI:
+gestione delle risorse limitate, compressione dei modelli, integrazione
+sensori-attuatori-agente. I vincoli di un dispositivo Edge vengono simulati
+limitando l'esecuzione a un solo thread CPU e disabilitando la GPU
+(Sezione~\ref{sec:edge-layer}); ciò nonostante, la CPU di un PC moderno
+resta tipicamente più veloce, per singolo core, di quella ARM di un
+Raspberry Pi, per cui le latenze assolute misurate in questo documento vanno
+lette come confronto \emph{relativo} fra le varianti del modello, non come
+predizione realistica dei tempi su hardware Edge effettivo.
 
 Il codice è scritto secondo il principio del \emph{drop-in replacement}: i
 moduli che simulano hardware (fotocamera, sensori, GPIO\footnote{\emph{General

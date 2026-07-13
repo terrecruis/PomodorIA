@@ -21,13 +21,14 @@ in quattro fasi che si ripetono indefinitamente:
     registrato per l'analisi successiva.
 \end{itemize}
 
-La seguente figura illustra il flusso dei dati fra i
-componenti software che realizzano questo ciclo: la fotocamera virtuale
-fornisce l'immagine al motore di inferenza e, insieme al simulatore
-ambientale, i dati di contesto all'agente decisionale; il motore di
-inferenza fornisce la diagnosi all'agente; solo l'agente decisionale
-comanda gli attuatori e produce il log -- il motore di inferenza non
-interagisce mai direttamente con gli attuatori.
+La seguente figura traduce queste quattro fasi nei
+componenti software che le realizzano. Un aspetto che vale la pena
+sottolineare è dove passano le informazioni: il motore di inferenza (Edge
+AI Layer) riceve l'immagine dalla fotocamera e restituisce la diagnosi, ma
+si ferma lì, non ha alcuna visibilità sui sensori ambientali né alcun
+accesso agli attuatori. È l'agente decisionale a ricevere sia la diagnosi
+della rete sia i dati ambientali, a combinarli, e solo lui ad avere
+l'autorità di azionare pompa, ventola e allarme e di scrivere il log. 
 
 \begin{figure}[h]
 \centering

@@ -12,14 +12,19 @@ Agent Layer, Actuator Layer, e i due programmi che li orchestrano.
 La classe \texttt{VirtualCameraSensor} simula una fotocamera installata
 nella serra, sostituendo un dispositivo fisico con un campionamento
 pseudo-casuale di immagini reali dal dataset PlantVillage-Tomato.
-All'inizializzazione scansiona la cartella del dataset e indicizza tutte le
-immagini disponibili per classe. Ad ogni chiamata di \texttt{capture()}
-seleziona un'immagine (uniformemente, oppure con un \emph{bias} verso una
-classe specifica se configurato, utile per simulare un'epidemia mirata in
-demo), applica il preprocessing (Sezione~\ref{sec:modello-ml}) e restituisce
-il tensore pronto per l'inferenza insieme all'etichetta reale -- nota perché
-proveniente da un dataset etichettato, usata solo per calcolare
-l'accuratezza nel PoC, mai fornita in input alla rete.
+All'inizializzazione scansiona la cartella del dataset (una sottocartella
+per classe) e costruisce in memoria due strutture: un dizionario che
+associa ad ogni classe la lista dei percorsi delle sue immagini -- usato
+per il campionamento mirato di una singola classe -- e una lista piatta di
+tutte le immagini del dataset, usata per il campionamento uniforme fra
+tutte le classi. Ad ogni chiamata di \texttt{capture()} viene scelta a caso
+un'immagine da una di queste due strutture: dalla lista completa nel caso
+uniforme, oppure dal sottoinsieme di una classe specifica se è impostato un
+\emph{bias} (configurabile, utile per simulare un'epidemia mirata in demo).
+L'immagine selezionata viene poi preprocessata (Sezione~\ref{sec:modello-ml})
+e restituita come tensore pronto per l'inferenza, insieme all'etichetta
+reale -- nota perché proveniente da un dataset etichettato, usata solo per
+calcolare l'accuratezza nel PoC, mai fornita in input alla rete.
 
 \begin{notebox}
 Per evitare che la CNN venga valutata su immagini già viste durante il

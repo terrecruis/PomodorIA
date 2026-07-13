@@ -42,11 +42,17 @@ specifica architettura:
     avverrebbe su architetture dominate da strati completamente connessi.
     \item \textbf{Il pruning strutturato al 30\% introduce una perdita di
     accuratezza significativa} (da 95,0\% a 82,2\%), a fronte di
-    \emph{nessuna} riduzione di dimensione su disco, poiché i pesi azzerati
-    non vengono automaticamente compattati in un formato più efficiente
-    senza un'ulteriore fase di conversione. Questo evidenzia come il
-    pruning, da solo, non sia sufficiente a ottenere benefici pratici senza
-    una tecnica di serializzazione dedicata ai formati sparsi.
+    \emph{nessuna} riduzione di dimensione su disco (33,44 MB, identica alla
+    baseline). Il motivo è che il pruning si limita ad azzerare i pesi dei
+    filtri scartati, ma il file salvato su disco continua a riservare lo
+    stesso spazio per ciascun peso, zero compreso: un filtro azzerato pesa
+    esattamente come uno non azzerato, finché non lo si salva in un formato
+    che memorizza esplicitamente solo i valori diversi da zero (un formato
+    "sparso"), operazione che la pipeline attuale non esegue. Il pruning da
+    solo, quindi, non produce alcun beneficio pratico in termini di
+    spazio occupato: serve sempre in combinazione con la quantizzazione (o
+    con un formato di salvataggio sparso) per tradursi in un file più
+    piccolo.
     \item \textbf{La combinazione pruning + quantizzazione} produce il file
     più compatto fra le due varianti PyTorch (9,43 MB), ma eredita
     interamente la perdita di accuratezza introdotta dal pruning
@@ -74,11 +80,33 @@ modo più marcato di quanto benefici in termini di prestazioni.
 Oltre alle metriche puramente relative al modello di classificazione, il
 sistema misura anche il comportamento dell'agente decisionale nel suo
 complesso: numero di cicli eseguiti, numero di rilevamenti di malattia
-consecutivi, e \emph{behavior accuracy} (la frazione di decisioni
-dell'agente coerenti con la classe reale nota dal dataset). Queste metriche,
-consultabili sia nel log CSV prodotto dall'orchestratore da riga di comando
-sia nella dashboard interattiva, permettono di valutare non solo la qualità
-della singola predizione della CNN, ma la correttezza del comportamento
-del sistema nel suo complesso (ad esempio, se l'attivazione della
-ventilazione sia realmente avvenuta in presenza di condizioni favorevoli a
-una patologia fungina).
+consecutivi, e \emph{behavior accuracy}\footnote{La \emph{behavior
+accuracy} è la percentuale di cicli in cui l'agente si è comportato in
+modo appropriato rispetto alla reale condizione della pianta: quanto
+spesso, cioè, la sua reazione (attivare la ventilazione, l'irrigazione,
+un allarme, o non fare nulla) è risultata quella corretta per la
+situazione realmente presente, non simulata. Non coincide quindi con
+l'accuratezza pura della CNN: un ciclo è considerato corretto non solo
+quando la classe predetta coincide con quella reale, ma anche quando
+entrambe appartengono alla categoria delle malattie fungine (Early
+Blight, Late Blight, Leaf Mold, Septoria Leaf Spot, Target Spot), pur
+essendo classi diverse. La ragione è che, per tutte le malattie fungine,
+l'agente applica la stessa regola decisionale (attivazione della
+ventilazione in presenza di umidità alta): se la CNN scambia una fungina
+per un'altra, la predizione "pura" è sbagliata, ma l'azione
+effettivamente intrapresa dall'agente è comunque quella corretta per la
+situazione reale. La metrica misura quindi quanto spesso l'agente si è
+comportato correttamente, non quanto spesso la CNN ha indovinato
+l'etichetta esatta -- ed è per questo tipicamente più alta
+dell'accuratezza di classificazione riportata in
+Tabella~\ref{tab:benchmark-finale}.} (la frazione di cicli in cui l'azione
+dell'agente è risultata coerente con la classe reale nota dal dataset). Le
+prime due
+sono visibili sia nel log CSV prodotto dall'orchestratore da riga di
+comando sia nella dashboard interattiva; la \emph{behavior accuracy} è
+invece calcolata e mostrata solo nel riepilogo finale dell'orchestratore da
+riga di comando, al termine della sessione. Queste metriche permettono di
+valutare non solo la qualità della singola predizione della CNN, ma la
+correttezza del comportamento del sistema nel suo complesso (ad esempio, se
+l'attivazione della ventilazione sia realmente avvenuta in presenza di
+condizioni favorevoli a una patologia fungina).

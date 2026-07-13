@@ -15,24 +15,47 @@ confronta tre approcci: pruning, quantizzazione, ed export in formato ONNX.
 \subsection{Pruning strutturato}
 
 Il \emph{pruning} ("potatura") rimuove i filtri convoluzionali meno
-rilevanti per la predizione finale. Nel progetto è realizzato con la
-funzione \texttt{torch.nn.utils.prune.ln\_structured}~\ref{bib:pytorch},
-applicata a ciascun layer \texttt{Conv2d} della rete con i seguenti
-parametri: norma \textbf{L1} ($n=1$) come criterio di importanza -- per
-ogni filtro si calcola la somma dei valori assoluti dei suoi pesi, un
-filtro con norma L1 bassa contribuisce in media poco all'attivazione finale
-ed è quindi un candidato alla rimozione -- lungo la dimensione
-\texttt{dim=0}, cioè i canali di output (i filtri stessi, non i canali di
-input); la frazione di filtri rimossi (\emph{sparsità}) è fissata al 30\%
-per ciascun layer.
+rilevanti per la predizione finale. Per capire quali filtri contano meno,
+il progetto calcola per ciascuno la sua norma L1\footnote{La \emph{norma
+L1} di un insieme di numeri (qui, i pesi di un filtro) è semplicemente la
+somma dei loro valori assoluti: più i pesi sono vicini a zero, più la
+norma L1 del filtro è bassa. È una delle tante misure possibili di
+"quanto è grande" un insieme di numeri; si preferisce ad altre proprio
+perché premia i pesi piccoli, rendendola un buon indicatore di quali
+filtri contribuiscono poco e possono quindi essere eliminati.}: un filtro
+con norma L1 bassa contribuisce in media poco all'attivazione finale della
+rete, ed è quindi un buon candidato alla rimozione. Applicando questo criterio a tutti i filtri di un layer
+convoluzionale, si eliminano quelli col punteggio più basso, fino a
+raggiungere la percentuale di rimozione desiderata (\emph{sparsità}),
+fissata al 30\% per ciascun layer nella pipeline attuale. In pratica, tutto
+questo è realizzato con una singola funzione di libreria,
+\texttt{torch.nn.utils.prune.ln\_structured}~\ref{bib:pytorch}, applicata
+a ciascun layer \texttt{Conv2d} della rete: le si indica di usare la norma
+L1 ($n=1$) e di operare lungo la dimensione dei filtri stessi
+(\texttt{dim=0}, i canali di output, non quelli di input).
 
-A differenza del pruning non strutturato (che azzera singoli pesi sparsi
-all'interno dei filtri, senza ridurre il numero di operazioni), il pruning
-\textbf{strutturato} elimina interi filtri: la rete risultante ha
+A differenza del pruning non strutturato, che azzera singoli pesi sparsi
+all'interno dei filtri senza ridurre il numero di operazioni (il filtro
+resta comunque intero, semplicemente con più zeri al suo interno), il
+pruning \textbf{strutturato} elimina interi filtri: la rete risultante ha
 effettivamente meno canali, quindi meno moltiplicazioni da eseguire durante
-l'inferenza, non solo pesi nulli da moltiplicare comunque. Dopo il pruning,
-la maschera che azzera i filtri selezionati viene fusa permanentemente nei
-pesi (\texttt{prune.remove}), eliminando l'overhead della maschera stessa.
+l'inferenza, e non solo pesi nulli che verrebbero comunque moltiplicati.
+
+Quando \texttt{ln\_structured} individua i filtri da eliminare, non li
+rimuove subito: crea invece una \emph{maschera}, cioè un secondo tensore
+delle stesse dimensioni dei pesi del layer, composto solo da 0 e 1 (0 dove
+il filtro è stato scartato, 1 dove è stato mantenuto), e mantiene separati
+sia i pesi originali sia questa maschera. Il valore effettivo usato in
+inferenza è il prodotto fra i due: dove la maschera vale 0 il peso
+corrispondente si annulla, anche se il suo valore originale è ancora
+conservato da qualche parte in memoria. Questo doppio binario è comodo in
+fase di sperimentazione (permette di annullare il pruning o cambiare i
+filtri scartati senza perdere i pesi originali), ma è inutilmente
+ingombrante per il modello finale. La chiamata a \texttt{prune.remove},
+alla fine della pipeline, fonde i due tensori in uno solo: applica la
+maschera una volta per tutte, scarta i pesi originali e la maschera stessa,
+e lascia un unico tensore di pesi -- più piccolo da salvare su disco e
+privo di qualunque struttura accessoria.
 
 \begin{notebox}
 La pipeline attuale applica il pruning in un unico passo, senza una fase di
