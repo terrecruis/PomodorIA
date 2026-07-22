@@ -71,15 +71,35 @@ l'occasione di riadattare i pesi restanti.
 La \emph{quantizzazione} converte i pesi del modello da virgola mobile a 32
 bit (float32) a un formato intero a 8 bit (INT8), riducendo la dimensione
 di un fattore prossimo a 4 e velocizzando i calcoli su CPU prive di unità
-dedicate al floating point ad alta precisione. Il progetto usa la
-\emph{quantizzazione dinamica}~\ref{bib:pytorch}: i pesi sono convertiti
-in anticipo, le attivazioni (i dati che attraversano la rete durante
-l'inferenza) vengono quantizzate al volo ad ogni esecuzione, senza bisogno
-di una fase di calibrazione su dati di esempio. È applicata per due strade
-distinte: direttamente in PyTorch, oppure dopo aver esportato il modello in formato \textbf{ONNX}\footnote{\emph{ONNX}: formato standard indipendente
-dal framework che rappresenta grafo e pesi in un unico file, eseguibile con
-\emph{ONNX Runtime}, spesso più efficiente in inferenza.} e quantizzato con
-\texttt{onnxruntime.quantization}~\ref{bib:onnx}.
+dedicate al floating point ad alta precisione.
+
+Esistono diverse varianti di quantizzazione, con un compromesso diverso fra
+semplicità e accuratezza recuperata: la \emph{quantizzazione statica}
+(post-training) richiede una fase di calibrazione su un piccolo campione di
+immagini per stimare i range delle attivazioni, ed è generalmente più
+efficace sulle reti convoluzionali; la \emph{Quantization-Aware Training}
+(QAT) simula la quantizzazione già durante un breve re-training, offrendo il
+miglior recupero di accuratezza al prezzo di dover riaddestrare il modello.
+Il progetto adotta invece la \emph{quantizzazione dinamica}~\ref{bib:pytorch},
+la variante più semplice: non richiede calibrazione né re-training, i pesi
+sono convertiti in anticipo mentre le attivazioni (i dati che attraversano
+la rete durante l'inferenza) vengono quantizzate al volo ad ogni esecuzione.
+È applicata per due strade distinte: direttamente in PyTorch, oppure dopo
+aver esportato il modello in formato \textbf{ONNX}\footnote{\emph{ONNX}:
+formato standard indipendente dal framework che rappresenta grafo e pesi in
+un unico file, eseguibile con \emph{ONNX Runtime}, spesso più efficiente in
+inferenza.} e quantizzato con \texttt{onnxruntime.quantization}~\ref{bib:onnx}.
+
+\begin{notebox}
+La quantizzazione dinamica di PyTorch è pensata principalmente per i layer
+\texttt{Linear}: sui layer \texttt{Conv2d}, che compongono la maggior parte
+dei filtri di questa rete, il beneficio è più limitato. È uno dei motivi per
+cui, nei risultati (Sezione~\ref{sec:risultati}), la variante
+\emph{Pruned+Quantized} (quantizzazione applicata direttamente in PyTorch)
+comprime meno della variante \emph{ONNX Quantized} (quantizzazione applicata
+dopo l'export, tramite \texttt{onnxruntime.quantization}, che gestisce i
+layer convoluzionali in modo diverso e più efficace).
+\end{notebox}
 
 \subsection{Le tre varianti compresse generate}
 
